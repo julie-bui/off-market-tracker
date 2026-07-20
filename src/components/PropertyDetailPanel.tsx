@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
 import { formatSpecsForDisplay } from "@/lib/specs";
-import { openStreetView } from "@/lib/street-view";
+import { buildStreetViewUrl, openStreetView } from "@/lib/street-view";
 import type { Property, PropertyFile } from "@/types/database";
 
 type PropertyDetailPanelProps = {
@@ -364,15 +364,21 @@ function PropertyDetailContent({
 
             {property.latitude != null && property.longitude != null ? (
               <section className="mb-5">
-                <button
-                  type="button"
-                  onClick={() => {
+                <a
+                  href={buildStreetViewUrl(
+                    property.latitude,
+                    property.longitude,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => {
+                    event.preventDefault();
                     openStreetView(property.latitude!, property.longitude!);
                   }}
                   className="inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900 hover:border-zinc-300 hover:bg-zinc-100"
                 >
                   View on Street View
-                </button>
+                </a>
               </section>
             ) : null}
 

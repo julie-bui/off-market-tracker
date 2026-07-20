@@ -10,6 +10,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
+import { openStreetView } from "@/lib/street-view";
 import type { Property, PropertyFile } from "@/types/database";
 
 type PropertyDetailPanelProps = {
@@ -77,54 +78,6 @@ function formatSpecs(specs: Property["specs"] | unknown): string {
   }
 
   return String(specs);
-}
-
-/**
- * Build a single Google Maps URLs API Street View link.
- * Format (only): https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lng}
- */
-function buildStreetViewUrl(latitude: number, longitude: number): string {
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    throw new Error("Invalid property coordinates for Street View");
-  }
-
-  // String concat (not template) so nothing can accidentally glue a second URL on.
-  return (
-    "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" +
-    String(lat) +
-    "," +
-    String(lng)
-  );
-}
-
-function openStreetView(latitude: number, longitude: number) {
-  const url = buildStreetViewUrl(latitude, longitude);
-
-  // Guard: must be exactly one http(s) URL and never the old panorama path format.
-  const schemeCount = (url.match(/https?:\/\//g) ?? []).length;
-  if (
-    schemeCount !== 1 ||
-    url.includes("3a,") ||
-    url.includes("75y") ||
-    url.includes("!3m6") ||
-    !url.startsWith("https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=")
-  ) {
-    console.error("Refusing to open malformed Street View URL:", url);
-    return;
-  }
-
-  console.log(url);
-
-  const anchor = document.createElement("a");
-  anchor.setAttribute("href", url);
-  anchor.setAttribute("target", "_blank");
-  anchor.setAttribute("rel", "noopener noreferrer");
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
 }
 
 function DetailRow({

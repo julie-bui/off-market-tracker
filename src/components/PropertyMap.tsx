@@ -107,6 +107,11 @@ function hidePoiLayers(map: maplibregl.Map) {
   }
 }
 
+function pinColorForStatus(status?: PropertyStatus | null): string {
+  if (!status) return STATUS_PIN_COLORS.available;
+  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.available;
+}
+
 /** Teardrop pin SVG — tip is at the bottom center of the viewBox. */
 function createPinSvg(fill: string): string {
   return `
@@ -131,7 +136,8 @@ function createMarkerElement(
   el.className = "property-map-marker";
   el.title = property.address;
   el.setAttribute("aria-label", `View ${property.address}`);
-  el.innerHTML = createPinSvg(PIN_COLOR);
+  el.dataset.status = property.status ?? "available";
+  el.innerHTML = createPinSvg(pinColorForStatus(property.status));
   el.addEventListener("click", (event) => {
     event.stopPropagation();
     onSelect(property.id);
@@ -249,7 +255,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
         void (async () => {
           const { data, error } = await supabase
             .from("properties")
-            .select("id, address, latitude, longitude");
+            .select("id, address, latitude, longitude, status");
 
           if (signal.cancelled) return;
 
@@ -271,6 +277,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
                 address: property.address,
                 latitude: property.latitude,
                 longitude: property.longitude,
+                status: property.status,
               },
               selectProperty,
             );

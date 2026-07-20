@@ -515,6 +515,21 @@ function PropertyDetailContent({
   );
 }
 
+const PANEL_MIN_WIDTH = 320;
+const PANEL_MAX_WIDTH_PX = 800;
+const PANEL_MAX_WIDTH_VW = 0.6;
+const PANEL_DEFAULT_WIDTH = 448; // ~max-w-md
+
+function clampPanelWidth(width: number): number {
+  const maxWidth = Math.min(
+    PANEL_MAX_WIDTH_PX,
+    typeof window !== "undefined"
+      ? Math.floor(window.innerWidth * PANEL_MAX_WIDTH_VW)
+      : PANEL_MAX_WIDTH_PX,
+  );
+  return Math.min(maxWidth, Math.max(PANEL_MIN_WIDTH, Math.round(width)));
+}
+
 export default function PropertyDetailPanel({
   propertyId,
   onClose,
@@ -523,13 +538,65 @@ export default function PropertyDetailPanel({
   refreshToken = 0,
 }: PropertyDetailPanelProps) {
   const open = propertyId != null;
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(PANEL_DEFAULT_WIDTH);
+
+  useEffect(() => {
+    function onWindowResize() {
+      setPanelWidth((current) => clampPanelWidth(current));
+    }
+
+    window.addEventListener("resize", onWindowResize);
+    return () => window.removeEventListener("resize", onWindowResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    function onPointerMove(event: PointerEvent) {
+      const delta = dragStartX.current - event.clientX;
+      setPanelWidth(clampPanelWidth(dragStartWidth.current + delta));
+    }
+
+    function onPointerUp() {
+      setIsResizing(false);
+    }
+
+    document.body.style.cursor = "ew-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
+
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
+    };
+  }, [isResizing]);
+
+  function startResize(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    dragStartX.current = event.clientX;
+    dragStartWidth.current = panelWidth;
+    setIsResizing(true);
+  }
 
   return (
     <aside
       className={[
-        "pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-full max-w-md flex-col bg-white shadow-xl transition-transform duration-300 ease-out",
+        "pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-full flex-col bg-white shadow-xl",
+        isResizing
+          ? ""
+          : "transition-transform duration-300 ease-out",
         open ? "translate-x-0" : "translate-x-full",
       ].join(" ")}
+      style={{ width: panelWidth, maxWidth: "100%" }}
       aria-hidden={!open}
       {...(open
         ? {
@@ -539,6 +606,36 @@ export default function PropertyDetailPanel({
           }
         : {})}
     >
+      {open ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize property details panel"
+          aria-valuemin={PANEL_MIN_WIDTH}
+          aria-valuemax={PANEL_MAX_WIDTH_PX}
+          aria-valuenow={panelWidth}
+          onPointerDown={startResize}
+          className="group/resize absolute inset-y-0 left-0 z-30 flex w-3 -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center"
+        >
+          <span
+            className={[
+              "pointer-events-none absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 transition-colors",
+              isResizing
+                ? "bg-zinc-400"
+                : "bg-transparent group-hover/resize:bg-zinc-300",
+            ].join(" ")}
+          />
+          <span
+            className={[
+              "relative h-10 w-1 rounded-full transition-colors",
+              isResizing
+                ? "bg-zinc-500"
+                : "bg-zinc-300/0 group-hover/resize:bg-zinc-400",
+            ].join(" ")}
+          />
+        </div>
+      ) : null}
+
       {propertyId ? (
         <PropertyDetailContent
           key={`${propertyId}-${refreshToken}`}

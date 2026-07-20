@@ -79,11 +79,7 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
   const didSwipe = useRef(false);
 
   if (images.length === 0) {
-    return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-md border border-dashed border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
-        No images attached
-      </div>
-    );
+    return null;
   }
 
   const count = images.length;
@@ -358,9 +354,11 @@ function PropertyDetailContent({
 
         {property ? (
           <>
-            <section className="mb-5">
-              <ImageCarousel images={images} onOpen={setLightboxUrl} />
-            </section>
+            {images.length > 0 ? (
+              <section className="mb-5">
+                <ImageCarousel images={images} onOpen={setLightboxUrl} />
+              </section>
+            ) : null}
 
             {property.latitude != null && property.longitude != null ? (
               <section className="mb-5">

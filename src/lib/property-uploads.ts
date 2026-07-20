@@ -40,11 +40,7 @@ export async function uploadPropertyImages(
 
   for (const [index, file] of files.entries()) {
     const path = `${propertyId}/image-${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
-    const url = await uploadPublicFile(
-      STORAGE_BUCKETS.propertyImages,
-      path,
-      file,
-    );
+    const url = await uploadPublicFile(STORAGE_BUCKETS.images, path, file);
     urls.push(url);
   }
 

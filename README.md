@@ -42,7 +42,7 @@ This creates:
 | `properties` | Core property records (`total_price` = `size_sqft * cost_per_sqft`) |
 | `property_files` | Brochure / image file references (`file_type`: `brochure` \| `image`) |
 | Storage bucket `brochures` | Public PDF uploads (max 50 MB) |
-| Storage bucket `property-images` | Public image uploads (max 10 MB) |
+| Storage bucket `images` | Public image uploads (max 10 MB) |
 
 Row Level Security is enabled with **open policies** for `anon` and `authenticated` (select/insert/update/delete). No login required.
 

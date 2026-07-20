@@ -145,8 +145,8 @@ values
     array['application/pdf']::text[]
   ),
   (
-    'property-images',
-    'property-images',
+    'images',
+    'images',
     true,
     10485760, -- 10 MB
     array['image/jpeg', 'image/png', 'image/webp', 'image/gif']::text[]
@@ -174,23 +174,23 @@ create policy "Public delete brochures"
   to anon, authenticated
   using (bucket_id = 'brochures');
 
-create policy "Public read property images"
+create policy "Public read images"
   on storage.objects for select
   to anon, authenticated
-  using (bucket_id = 'property-images');
+  using (bucket_id = 'images');
 
-create policy "Public upload property images"
+create policy "Public upload images"
   on storage.objects for insert
   to anon, authenticated
-  with check (bucket_id = 'property-images');
+  with check (bucket_id = 'images');
 
-create policy "Public update property images"
+create policy "Public update images"
   on storage.objects for update
   to anon, authenticated
-  using (bucket_id = 'property-images')
-  with check (bucket_id = 'property-images');
+  using (bucket_id = 'images')
+  with check (bucket_id = 'images');
 
-create policy "Public delete property images"
+create policy "Public delete images"
   on storage.objects for delete
   to anon, authenticated
-  using (bucket_id = 'property-images');
+  using (bucket_id = 'images');

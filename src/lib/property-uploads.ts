@@ -40,7 +40,8 @@ export async function uploadPropertyImages(
 
   for (const [index, file] of files.entries()) {
     const path = `${propertyId}/image-${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
-    const url = await uploadPublicFile(STORAGE_BUCKETS.images, path, file);
+    // Supabase bucket id is `images` (not `property-images`)
+    const url = await uploadPublicFile("images", path, file);
     urls.push(url);
   }
 

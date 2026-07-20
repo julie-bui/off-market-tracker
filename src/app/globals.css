@@ -16,3 +16,8 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+/* MapLibre canvas fills its parent */
+.maplibregl-map {
+  font: inherit;
+}

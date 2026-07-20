@@ -80,7 +80,7 @@ function formatSpecs(specs: Property["specs"] | unknown): string {
 }
 
 function streetViewUrl(latitude: number, longitude: number): string {
-  return `https://www.google.com/maps/@${latitude},${longitude},3a,75y,90t/data=!3m6!1e1`;
+  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${latitude},${longitude}`;
 }
 
 function DetailRow({

@@ -10,6 +10,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
+import { formatSpecsForDisplay } from "@/lib/specs";
 import { openStreetView } from "@/lib/street-view";
 import type { Property, PropertyFile } from "@/types/database";
 
@@ -49,35 +50,6 @@ function formatDateTime(value: string | null | undefined): string {
 function formatLabel(value: string | null | undefined): string {
   if (!value) return "—";
   return value.replaceAll("_", " ");
-}
-
-function formatSpecs(specs: Property["specs"] | unknown): string {
-  if (specs == null) return "—";
-
-  if (typeof specs === "object" && !Array.isArray(specs)) {
-    const record = specs as Record<string, unknown>;
-    if (typeof record.text === "string") return formatSpecs(record.text);
-    if (Object.keys(record).length === 0) return "—";
-    return "—";
-  }
-
-  if (typeof specs === "string") {
-    const trimmed = specs.trim();
-    if (!trimmed) return "—";
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith('"') && trimmed.endsWith('"'))
-    ) {
-      try {
-        return formatSpecs(JSON.parse(trimmed));
-      } catch {
-        return trimmed;
-      }
-    }
-    return trimmed;
-  }
-
-  return String(specs);
 }
 
 function DetailRow({
@@ -474,7 +446,7 @@ function PropertyDetailContent({
                   )
                 }
               />
-              <DetailRow label="Specs" value={formatSpecs(property.specs)} />
+              <DetailRow label="Specs" value={formatSpecsForDisplay(property.specs)} />
               <DetailRow label="Notes" value={property.notes ?? "—"} />
               <DetailRow
                 label="Created"

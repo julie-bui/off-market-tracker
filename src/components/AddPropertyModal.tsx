@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { geocodeAddress } from "@/lib/geocode";
 import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
+import { specsForSave, specsToPlainText } from "@/lib/specs";
 import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
@@ -84,35 +85,6 @@ const INITIAL_FORM: FormState = {
   notes: "",
 };
 
-function specsToText(specs: Property["specs"] | unknown): string {
-  if (specs == null) return "";
-
-  if (typeof specs === "object" && !Array.isArray(specs)) {
-    const record = specs as Record<string, unknown>;
-    if (typeof record.text === "string") return specsToText(record.text);
-    if (Object.keys(record).length === 0) return "";
-    return "";
-  }
-
-  if (typeof specs === "string") {
-    const trimmed = specs.trim();
-    if (!trimmed) return "";
-    if (
-      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-      (trimmed.startsWith('"') && trimmed.endsWith('"'))
-    ) {
-      try {
-        return specsToText(JSON.parse(trimmed));
-      } catch {
-        return specs;
-      }
-    }
-    return specs;
-  }
-
-  return String(specs);
-}
-
 function propertyToFormState(property: Property): FormState {
   return {
     address: property.address,
@@ -125,7 +97,7 @@ function propertyToFormState(property: Property): FormState {
     agent_name: property.agent_name ?? "",
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
-    specs: specsToText(property.specs),
+    specs: specsToPlainText(property.specs),
     notes: property.notes ?? "",
   };
 }
@@ -171,10 +143,11 @@ export default function AddPropertyModal({
   const [keptFiles, setKeptFiles] = useState<PropertyFile[]>(existingFiles);
   const [removedFiles, setRemovedFiles] = useState<PropertyFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [addressError, setAddressError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<SimilarProperty | null>(null);
-  const [duplicateIgnored, setDuplicateIgnored] = useState(false);
+  const duplicateIgnoredRef = useRef(false);
   const [uploadRetry, setUploadRetry] = useState<PendingUploadRetry | null>(
     null,
   );
@@ -197,7 +170,7 @@ export default function AddPropertyModal({
     if (key === "address" || key === "postcode") {
       setAddressError(null);
       setDuplicate(null);
-      setDuplicateIgnored(false);
+      duplicateIgnoredRef.current = false;
     }
   }
 
@@ -323,6 +296,10 @@ export default function AddPropertyModal({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    // Synchronous guard — React state alone cannot block double-submit races.
+    if (submittingRef.current) return;
+
     setError(null);
     setAddressError(null);
     setUploadRetry(null);
@@ -344,16 +321,16 @@ export default function AddPropertyModal({
     const postcode = form.postcode.trim();
     const query = [address, postcode].filter(Boolean).join(", ");
 
+    submittingRef.current = true;
     setSubmitting(true);
 
     let createdPropertyId: string | null = null;
 
     try {
-      if (!isEditing && !duplicateIgnored) {
+      if (!isEditing && !duplicateIgnoredRef.current) {
         const similar = await findSimilarProperty({ address, postcode });
         if (similar) {
           setDuplicate(similar);
-          setSubmitting(false);
           return;
         }
       }
@@ -384,7 +361,7 @@ export default function AddPropertyModal({
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
-        specs: form.specs.trim() || null,
+        specs: specsForSave(form.specs),
         notes: form.notes.trim() || null,
       };
 
@@ -506,13 +483,15 @@ export default function AddPropertyModal({
         err instanceof Error ? err.message : "Something went wrong while saving.";
       setError(message);
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   async function handleRetryUploads() {
-    if (!uploadRetry) return;
+    if (!uploadRetry || submittingRef.current) return;
 
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
 
@@ -550,14 +529,15 @@ export default function AddPropertyModal({
       setImages(remainingImages);
       setError(uploadFailureMessage(failedFileName));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   }
 
   function handleContinueDespiteDuplicate() {
-    setDuplicateIgnored(true);
+    // Ref must flip synchronously so the re-submit sees the acknowledgment.
+    duplicateIgnoredRef.current = true;
     setDuplicate(null);
-    // Re-submit programmatically after acknowledging the warning.
     queueMicrotask(() => {
       const formEl = document.getElementById(
         "add-property-form",

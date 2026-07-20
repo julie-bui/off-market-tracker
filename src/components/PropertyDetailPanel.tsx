@@ -117,27 +117,35 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
     );
   }
 
-  const safeIndex = Math.min(index, images.length - 1);
+  const count = images.length;
+  const safeIndex = ((index % count) + count) % count;
   const current = images[safeIndex];
 
   function goTo(next: number) {
-    const count = images.length;
     setIndex(((next % count) + count) % count);
   }
 
-  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+  function goPrev() {
+    goTo(safeIndex - 1);
+  }
+
+  function goNext() {
+    goTo(safeIndex + 1);
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
     dragStartX.current = event.clientX;
     dragDeltaX.current = 0;
     didSwipe.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
     if (dragStartX.current == null) return;
     dragDeltaX.current = event.clientX - dragStartX.current;
   }
 
-  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerUp(event: ReactPointerEvent<HTMLButtonElement>) {
     if (dragStartX.current == null) return;
 
     const delta = dragDeltaX.current;
@@ -152,21 +160,19 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
 
     if (Math.abs(delta) < 40) return;
     didSwipe.current = true;
-    if (delta < 0) goTo(safeIndex + 1);
-    else goTo(safeIndex - 1);
+    if (delta < 0) goNext();
+    else goPrev();
   }
 
   return (
     <div className="space-y-3">
-      <div
-        className="relative aspect-[4/3] touch-pan-y overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 select-none"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      >
+      <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 select-none">
         <button
           type="button"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
           onClick={() => {
             if (didSwipe.current) {
               didSwipe.current = false;
@@ -174,38 +180,43 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
             }
             onOpen(current.file_url);
           }}
-          className="absolute inset-0"
+          className="absolute inset-0 touch-pan-y"
           aria-label="Open image"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            key={current.id}
             src={current.file_url}
             alt=""
-            className="h-full w-full object-cover"
+            className="pointer-events-none h-full w-full object-cover"
             draggable={false}
           />
         </button>
 
-        {images.length > 1 ? (
+        {count > 1 ? (
           <>
             <button
               type="button"
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
+                event.preventDefault();
                 event.stopPropagation();
-                goTo(safeIndex - 1);
+                goPrev();
               }}
-              className="absolute top-1/2 left-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
+              className="absolute top-1/2 left-2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
               aria-label="Previous image"
             >
               ‹
             </button>
             <button
               type="button"
+              onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
+                event.preventDefault();
                 event.stopPropagation();
-                goTo(safeIndex + 1);
+                goNext();
               }}
-              className="absolute top-1/2 right-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
+              className="absolute top-1/2 right-2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
               aria-label="Next image"
             >
               ›
@@ -214,7 +225,7 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
         ) : null}
       </div>
 
-      {images.length > 1 ? (
+      {count > 1 ? (
         <div className="flex items-center justify-center gap-1.5">
           {images.map((image, i) => (
             <button
@@ -226,7 +237,7 @@ function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
                 i === safeIndex ? "bg-zinc-800" : "bg-zinc-300 hover:bg-zinc-400",
               ].join(" ")}
               aria-label={`Go to image ${i + 1}`}
-              aria-current={i === safeIndex}
+              aria-current={i === safeIndex ? "true" : undefined}
             />
           ))}
         </div>

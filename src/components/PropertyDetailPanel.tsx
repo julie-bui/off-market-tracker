@@ -79,18 +79,52 @@ function formatSpecs(specs: Property["specs"] | unknown): string {
   return String(specs);
 }
 
-/** Official Google Maps URLs API Street View link (map_action=pano only). */
-function streetViewUrl(latitude: number, longitude: number): string {
+/**
+ * Build a single Google Maps URLs API Street View link.
+ * Format (only): https://www.google.com/maps/@?api=1&map_action=pano&viewpoint={lat},{lng}
+ */
+function buildStreetViewUrl(latitude: number, longitude: number): string {
   const lat = Number(latitude);
   const lng = Number(longitude);
-  return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    throw new Error("Invalid property coordinates for Street View");
+  }
+
+  // String concat (not template) so nothing can accidentally glue a second URL on.
+  return (
+    "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" +
+    String(lat) +
+    "," +
+    String(lng)
+  );
 }
 
 function openStreetView(latitude: number, longitude: number) {
-  const url = streetViewUrl(latitude, longitude);
-  // Single final URL for verification in DevTools.
+  const url = buildStreetViewUrl(latitude, longitude);
+
+  // Guard: must be exactly one http(s) URL and never the old panorama path format.
+  const schemeCount = (url.match(/https?:\/\//g) ?? []).length;
+  if (
+    schemeCount !== 1 ||
+    url.includes("3a,") ||
+    url.includes("75y") ||
+    url.includes("!3m6") ||
+    !url.startsWith("https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=")
+  ) {
+    console.error("Refusing to open malformed Street View URL:", url);
+    return;
+  }
+
   console.log(url);
-  window.open(url, "_blank", "noopener,noreferrer");
+
+  const anchor = document.createElement("a");
+  anchor.setAttribute("href", url);
+  anchor.setAttribute("target", "_blank");
+  anchor.setAttribute("rel", "noopener noreferrer");
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 function DetailRow({
@@ -405,18 +439,15 @@ function PropertyDetailContent({
 
             {property.latitude != null && property.longitude != null ? (
               <section className="mb-5">
-                <a
-                  href={streetViewUrl(property.latitude, property.longitude)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => {
-                    event.preventDefault();
+                <button
+                  type="button"
+                  onClick={() => {
                     openStreetView(property.latitude!, property.longitude!);
                   }}
                   className="inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900 hover:border-zinc-300 hover:bg-zinc-100"
                 >
                   View on Street View
-                </a>
+                </button>
               </section>
             ) : null}
 

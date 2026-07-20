@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -8,6 +13,17 @@ import { supabase } from "@/lib/supabase";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
 const DEFAULT_ZOOM = 11;
+
+export type PropertyMarkerData = {
+  id: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type PropertyMapHandle = {
+  addMarker: (property: PropertyMarkerData) => void;
+};
 
 type PropertyMarkerRow = {
   id: string;
@@ -36,7 +52,11 @@ function isPoiLayer(layerId: string, sourceLayer?: string): boolean {
   const source = (sourceLayer ?? "").toLowerCase();
 
   if (source === "poi" || source.startsWith("poi")) return true;
-  if (/(^|[-_ ])poi([-_ .]|$)/.test(id) || id.includes("poi-") || id.startsWith("poi")) {
+  if (
+    /(^|[-_ ])poi([-_ .]|$)/.test(id) ||
+    id.includes("poi-") ||
+    id.startsWith("poi")
+  ) {
     return true;
   }
   if (
@@ -70,40 +90,40 @@ function hidePoiLayers(map: maplibregl.Map) {
   }
 }
 
-async function addPropertyMarkers(
+function createPropertyMarker(
   map: maplibregl.Map,
-  markers: maplibregl.Marker[],
-  signal: { cancelled: boolean },
-) {
-  const { data, error } = await supabase
-    .from("properties")
-    .select("id, address, latitude, longitude");
-
-  if (signal.cancelled) return;
-
-  if (error) {
-    console.error("Failed to fetch properties from Supabase:", error);
-    return;
-  }
-
-  const properties = (data ?? []) as PropertyMarkerRow[];
-
-  for (const property of properties) {
-    if (property.latitude == null || property.longitude == null) continue;
-
-    const marker = new maplibregl.Marker()
-      .setLngLat([property.longitude, property.latitude])
-      .setPopup(
-        new maplibregl.Popup({ offset: 24 }).setText(property.address),
-      )
-      .addTo(map);
-
-    markers.push(marker);
-  }
+  property: PropertyMarkerData,
+): maplibregl.Marker {
+  return new maplibregl.Marker()
+    .setLngLat([property.longitude, property.latitude])
+    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(property.address))
+    .addTo(map);
 }
 
-export default function PropertyMap() {
+const PropertyMap = forwardRef<PropertyMapHandle>(function PropertyMap(
+  _props,
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const markerIdsRef = useRef<Set<string>>(new Set());
+
+  useImperativeHandle(ref, () => ({
+    addMarker(property: PropertyMarkerData) {
+      const map = mapRef.current;
+      if (!map) return;
+      if (markerIdsRef.current.has(property.id)) return;
+
+      const marker = createPropertyMarker(map, property);
+      markersRef.current.push(marker);
+      markerIdsRef.current.add(property.id);
+      map.flyTo({
+        center: [property.longitude, property.latitude],
+        zoom: Math.max(map.getZoom(), 13),
+      });
+    },
+  }));
 
   useEffect(() => {
     const container = containerRef.current;
@@ -117,8 +137,9 @@ export default function PropertyMap() {
       return;
     }
 
-    const markers: maplibregl.Marker[] = [];
     const signal = { cancelled: false };
+    const markers = markersRef.current;
+    const markerIds = markerIdsRef.current;
 
     const map = new maplibregl.Map({
       container,
@@ -126,13 +147,45 @@ export default function PropertyMap() {
       center: LONDON_CENTER,
       zoom: DEFAULT_ZOOM,
     });
+    mapRef.current = map;
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: true }), "top-right");
+    map.addControl(
+      new maplibregl.NavigationControl({ showCompass: true }),
+      "top-right",
+    );
 
     map.on("load", () => {
       if (signal.cancelled) return;
       hidePoiLayers(map);
-      void addPropertyMarkers(map, markers, signal);
+
+      void (async () => {
+        const { data, error } = await supabase
+          .from("properties")
+          .select("id, address, latitude, longitude");
+
+        if (signal.cancelled) return;
+
+        if (error) {
+          console.error("Failed to fetch properties from Supabase:", error);
+          return;
+        }
+
+        const properties = (data ?? []) as PropertyMarkerRow[];
+
+        for (const property of properties) {
+          if (property.latitude == null || property.longitude == null) continue;
+          if (markerIds.has(property.id)) continue;
+
+          const marker = createPropertyMarker(map, {
+            id: property.id,
+            address: property.address,
+            latitude: property.latitude,
+            longitude: property.longitude,
+          });
+          markers.push(marker);
+          markerIds.add(property.id);
+        }
+      })();
     });
 
     return () => {
@@ -140,6 +193,9 @@ export default function PropertyMap() {
       for (const marker of markers) {
         marker.remove();
       }
+      markers.length = 0;
+      markerIds.clear();
+      mapRef.current = null;
       map.remove();
     };
   }, []);
@@ -152,4 +208,6 @@ export default function PropertyMap() {
       aria-label="Property map"
     />
   );
-}
+});
+
+export default PropertyMap;

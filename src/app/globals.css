@@ -21,3 +21,19 @@ body {
 .maplibregl-map {
   font: inherit;
 }
+
+.property-map-marker {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #ffffff;
+  border-radius: 9999px;
+  background: #18181b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+.property-map-marker:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}

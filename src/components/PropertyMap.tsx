@@ -23,6 +23,13 @@ export type PropertyMarkerData = {
 
 export type PropertyMapHandle = {
   addMarker: (property: PropertyMarkerData) => void;
+  updateMarker: (property: PropertyMarkerData) => void;
+  removeMarker: (propertyId: string) => void;
+};
+
+type PropertyMapProps = {
+  onPropertySelect?: (propertyId: string) => void;
+  onMapBackgroundClick?: () => void;
 };
 
 type PropertyMarkerRow = {
@@ -90,124 +97,182 @@ function hidePoiLayers(map: maplibregl.Map) {
   }
 }
 
+function createMarkerElement(
+  property: PropertyMarkerData,
+  onSelect: (propertyId: string) => void,
+): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "property-map-marker";
+  el.title = property.address;
+  el.setAttribute("aria-label", `View ${property.address}`);
+  el.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onSelect(property.id);
+  });
+  return el;
+}
+
 function createPropertyMarker(
   map: maplibregl.Map,
   property: PropertyMarkerData,
+  onSelect: (propertyId: string) => void,
 ): maplibregl.Marker {
-  return new maplibregl.Marker()
+  return new maplibregl.Marker({
+    element: createMarkerElement(property, onSelect),
+    anchor: "bottom",
+  })
     .setLngLat([property.longitude, property.latitude])
-    .setPopup(new maplibregl.Popup({ offset: 24 }).setText(property.address))
     .addTo(map);
 }
 
-const PropertyMap = forwardRef<PropertyMapHandle>(function PropertyMap(
-  _props,
-  ref,
-) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
-  const markerIdsRef = useRef<Set<string>>(new Set());
+const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
+  function PropertyMap({ onPropertySelect, onMapBackgroundClick }, ref) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mapRef = useRef<maplibregl.Map | null>(null);
+    const markersByIdRef = useRef(new Map<string, maplibregl.Marker>());
+    const onSelectRef = useRef(onPropertySelect);
+    const onBackgroundClickRef = useRef(onMapBackgroundClick);
 
-  useImperativeHandle(ref, () => ({
-    addMarker(property: PropertyMarkerData) {
-      const map = mapRef.current;
-      if (!map) return;
-      if (markerIdsRef.current.has(property.id)) return;
+    useEffect(() => {
+      onSelectRef.current = onPropertySelect;
+    }, [onPropertySelect]);
 
-      const marker = createPropertyMarker(map, property);
-      markersRef.current.push(marker);
-      markerIdsRef.current.add(property.id);
-      map.flyTo({
-        center: [property.longitude, property.latitude],
-        zoom: Math.max(map.getZoom(), 13),
-      });
-    },
-  }));
+    useEffect(() => {
+      onBackgroundClickRef.current = onMapBackgroundClick;
+    }, [onMapBackgroundClick]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-    if (!maptilerKey) {
-      console.error(
-        "Missing NEXT_PUBLIC_MAPTILER_KEY. Add it to .env.local to load the map.",
-      );
-      return;
+    function selectProperty(propertyId: string) {
+      onSelectRef.current?.(propertyId);
     }
 
-    const signal = { cancelled: false };
-    const markers = markersRef.current;
-    const markerIds = markerIdsRef.current;
+    useImperativeHandle(ref, () => {
+      function updateMarker(property: PropertyMarkerData) {
+        const map = mapRef.current;
+        if (!map) return;
 
-    const map = new maplibregl.Map({
-      container,
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`,
-      center: LONDON_CENTER,
-      zoom: DEFAULT_ZOOM,
-    });
-    mapRef.current = map;
+        const existing = markersByIdRef.current.get(property.id);
+        existing?.remove();
 
-    map.addControl(
-      new maplibregl.NavigationControl({ showCompass: true }),
-      "top-right",
-    );
+        const marker = createPropertyMarker(map, property, selectProperty);
+        markersByIdRef.current.set(property.id, marker);
+      }
 
-    map.on("load", () => {
-      if (signal.cancelled) return;
-      hidePoiLayers(map);
+      function addMarker(property: PropertyMarkerData) {
+        const map = mapRef.current;
+        if (!map) return;
 
-      void (async () => {
-        const { data, error } = await supabase
-          .from("properties")
-          .select("id, address, latitude, longitude");
-
-        if (signal.cancelled) return;
-
-        if (error) {
-          console.error("Failed to fetch properties from Supabase:", error);
+        if (markersByIdRef.current.has(property.id)) {
+          updateMarker(property);
           return;
         }
 
-        const properties = (data ?? []) as PropertyMarkerRow[];
+        const marker = createPropertyMarker(map, property, selectProperty);
+        markersByIdRef.current.set(property.id, marker);
+        map.flyTo({
+          center: [property.longitude, property.latitude],
+          zoom: Math.max(map.getZoom(), 13),
+        });
+      }
 
-        for (const property of properties) {
-          if (property.latitude == null || property.longitude == null) continue;
-          if (markerIds.has(property.id)) continue;
+      function removeMarker(propertyId: string) {
+        const marker = markersByIdRef.current.get(propertyId);
+        marker?.remove();
+        markersByIdRef.current.delete(propertyId);
+      }
 
-          const marker = createPropertyMarker(map, {
-            id: property.id,
-            address: property.address,
-            latitude: property.latitude,
-            longitude: property.longitude,
-          });
-          markers.push(marker);
-          markerIds.add(property.id);
-        }
-      })();
+      return { addMarker, updateMarker, removeMarker };
     });
 
-    return () => {
-      signal.cancelled = true;
-      for (const marker of markers) {
-        marker.remove();
-      }
-      markers.length = 0;
-      markerIds.clear();
-      mapRef.current = null;
-      map.remove();
-    };
-  }, []);
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
 
-  return (
-    <div
-      ref={containerRef}
-      className="h-full w-full min-h-[480px]"
-      role="region"
-      aria-label="Property map"
-    />
-  );
-});
+      const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
+      if (!maptilerKey) {
+        console.error(
+          "Missing NEXT_PUBLIC_MAPTILER_KEY. Add it to .env.local to load the map.",
+        );
+        return;
+      }
+
+      const signal = { cancelled: false };
+      const markersById = markersByIdRef.current;
+
+      const map = new maplibregl.Map({
+        container,
+        style: `https://api.maptiler.com/maps/streets-v2/style.json?key=${maptilerKey}`,
+        center: LONDON_CENTER,
+        zoom: DEFAULT_ZOOM,
+      });
+      mapRef.current = map;
+
+      map.addControl(
+        new maplibregl.NavigationControl({ showCompass: true }),
+        "top-right",
+      );
+
+      map.on("click", () => {
+        onBackgroundClickRef.current?.();
+      });
+
+      map.on("load", () => {
+        if (signal.cancelled) return;
+        hidePoiLayers(map);
+
+        void (async () => {
+          const { data, error } = await supabase
+            .from("properties")
+            .select("id, address, latitude, longitude");
+
+          if (signal.cancelled) return;
+
+          if (error) {
+            console.error("Failed to fetch properties from Supabase:", error);
+            return;
+          }
+
+          const properties = (data ?? []) as PropertyMarkerRow[];
+
+          for (const property of properties) {
+            if (property.latitude == null || property.longitude == null) continue;
+            if (markersById.has(property.id)) continue;
+
+            const marker = createPropertyMarker(
+              map,
+              {
+                id: property.id,
+                address: property.address,
+                latitude: property.latitude,
+                longitude: property.longitude,
+              },
+              selectProperty,
+            );
+            markersById.set(property.id, marker);
+          }
+        })();
+      });
+
+      return () => {
+        signal.cancelled = true;
+        for (const marker of markersById.values()) {
+          marker.remove();
+        }
+        markersById.clear();
+        mapRef.current = null;
+        map.remove();
+      };
+    }, []);
+
+    return (
+      <div
+        ref={containerRef}
+        className="h-full w-full min-h-[480px]"
+        role="region"
+        aria-label="Property map"
+      />
+    );
+  },
+);
 
 export default PropertyMap;

@@ -15,6 +15,7 @@ import {
   uploadPropertyImages,
 } from "@/lib/property-uploads";
 import type {
+  Property,
   PropertySector,
   PropertyStatus,
 } from "@/types/database";
@@ -48,6 +49,8 @@ type AddPropertyModalProps = {
   open: boolean;
   onClose: () => void;
   onCreated: (property: CreatedPropertyMarker) => void;
+  onUpdated?: (property: CreatedPropertyMarker) => void;
+  propertyToEdit?: Property | null;
 };
 
 type FormState = {
@@ -84,6 +87,42 @@ const INITIAL_FORM: FormState = {
   notes: "",
 };
 
+function specsToText(specs: Property["specs"]): string {
+  if (specs == null) return "";
+  if (typeof specs === "string") return specs;
+  if (typeof specs === "object" && !Array.isArray(specs)) {
+    if (typeof specs.text === "string") return specs.text;
+    if (Object.keys(specs).length === 0) return "";
+    return JSON.stringify(specs, null, 2);
+  }
+  return String(specs);
+}
+
+function propertyToFormState(property: Property): FormState {
+  const tenure: Tenure | "" =
+    property.tenure === "freehold" || property.tenure === "leasehold"
+      ? property.tenure
+      : "";
+
+  return {
+    address: property.address,
+    postcode: property.postcode ?? "",
+    sector: property.sector ?? "",
+    size_sqft: property.size_sqft != null ? String(property.size_sqft) : "",
+    cost_per_sqft:
+      property.cost_per_sqft != null ? String(property.cost_per_sqft) : "",
+    availability_period: property.availability_period ?? "",
+    status: property.status,
+    tenure,
+    lease_length: property.lease_length ?? "",
+    agent_name: property.agent_name ?? "",
+    agent_phone: property.agent_phone ?? "",
+    agent_email: property.agent_email ?? "",
+    specs: specsToText(property.specs),
+    notes: property.notes ?? "",
+  };
+}
+
 function parseOptionalNumber(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -107,9 +146,14 @@ export default function AddPropertyModal({
   open,
   onClose,
   onCreated,
+  onUpdated,
+  propertyToEdit = null,
 }: AddPropertyModalProps) {
+  const isEditing = propertyToEdit != null;
   const titleId = useId();
-  const [form, setForm] = useState<FormState>(INITIAL_FORM);
+  const [form, setForm] = useState<FormState>(() =>
+    propertyToEdit ? propertyToFormState(propertyToEdit) : INITIAL_FORM,
+  );
   const [brochure, setBrochure] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -170,32 +214,43 @@ export default function AddPropertyModal({
       const leaseLength =
         tenure === "leasehold" ? form.lease_length.trim() || null : null;
 
-      const { data: property, error: insertError } = await supabase
-        .from("properties")
-        .insert({
-          address,
-          postcode: form.postcode.trim() || null,
-          latitude: geocoded.latitude,
-          longitude: geocoded.longitude,
-          sector: form.sector || null,
-          size_sqft: sizeSqft,
-          cost_per_sqft: costPerSqft,
-          availability_period: form.availability_period.trim() || null,
-          status: form.status,
-          tenure,
-          lease_length: leaseLength,
-          agent_name: form.agent_name.trim() || null,
-          agent_phone: form.agent_phone.trim() || null,
-          agent_email: form.agent_email.trim() || null,
-          specs: form.specs.trim() ? { text: form.specs.trim() } : {},
-          notes: form.notes.trim() || null,
-        })
-        .select("id, address, latitude, longitude")
-        .single();
+      const payload = {
+        address,
+        postcode: form.postcode.trim() || null,
+        latitude: geocoded.latitude,
+        longitude: geocoded.longitude,
+        sector: form.sector || null,
+        size_sqft: sizeSqft,
+        cost_per_sqft: costPerSqft,
+        availability_period: form.availability_period.trim() || null,
+        status: form.status,
+        tenure,
+        lease_length: leaseLength,
+        agent_name: form.agent_name.trim() || null,
+        agent_phone: form.agent_phone.trim() || null,
+        agent_email: form.agent_email.trim() || null,
+        specs: form.specs.trim() ? { text: form.specs.trim() } : {},
+        notes: form.notes.trim() || null,
+      };
 
-      if (insertError || !property) {
+      const mutation = isEditing
+        ? supabase
+            .from("properties")
+            .update(payload)
+            .eq("id", propertyToEdit.id)
+            .select("id, address, latitude, longitude")
+            .single()
+        : supabase
+            .from("properties")
+            .insert(payload)
+            .select("id, address, latitude, longitude")
+            .single();
+
+      const { data: property, error: saveError } = await mutation;
+
+      if (saveError || !property) {
         throw new Error(
-          insertError?.message ?? "Failed to save the property record.",
+          saveError?.message ?? "Failed to save the property record.",
         );
       }
 
@@ -244,12 +299,18 @@ export default function AddPropertyModal({
         throw new Error("Property saved without coordinates.");
       }
 
-      onCreated({
+      const markerPayload = {
         id: property.id,
         address: property.address,
         latitude: property.latitude,
         longitude: property.longitude,
-      });
+      };
+
+      if (isEditing) {
+        onUpdated?.(markerPayload);
+      } else {
+        onCreated(markerPayload);
+      }
       onClose();
     } catch (err) {
       const message =
@@ -283,10 +344,12 @@ export default function AddPropertyModal({
         <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-zinc-900">
-              Add property
+              {isEditing ? "Edit property" : "Add property"}
             </h2>
             <p className="mt-1 text-sm text-zinc-500">
-              Geocodes the address, uploads files, and drops a marker on the map.
+              {isEditing
+                ? "Update details, re-geocode the address, and optionally add more files."
+                : "Geocodes the address, uploads files, and drops a marker on the map."}
             </p>
           </div>
           <button
@@ -526,7 +589,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Brochure (PDF)
+                  Brochure (PDF){isEditing ? " — add another" : ""}
                 </span>
                 <input
                   type="file"
@@ -538,7 +601,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Images
+                  Images{isEditing ? " — add more" : ""}
                 </span>
                 <input
                   type="file"
@@ -572,7 +635,7 @@ export default function AddPropertyModal({
               disabled={submitting}
               className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {submitting ? "Saving…" : "Save property"}
+              {submitting ? "Saving…" : isEditing ? "Save changes" : "Save property"}
             </button>
           </div>
         </form>

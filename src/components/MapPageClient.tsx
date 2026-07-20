@@ -1,27 +1,66 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import AddPropertyModal, {
   type CreatedPropertyMarker,
 } from "@/components/AddPropertyModal";
+import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import PropertyMap, {
   type PropertyMapHandle,
 } from "@/components/PropertyMap";
+import type { Property } from "@/types/database";
 
 export default function MapPageClient() {
   const mapRef = useRef<PropertyMapHandle>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKey, setModalKey] = useState(0);
+  const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
+    null,
+  );
+  const [detailRefreshToken, setDetailRefreshToken] = useState(0);
 
-  function openModal() {
+  const openCreateModal = useCallback(() => {
+    setPropertyToEdit(null);
     setModalKey((key) => key + 1);
     setModalOpen(true);
-  }
+  }, []);
 
-  function handleCreated(property: CreatedPropertyMarker) {
+  const openEditModal = useCallback((property: Property) => {
+    setPropertyToEdit(property);
+    setModalKey((key) => key + 1);
+    setModalOpen(true);
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setPropertyToEdit(null);
+  }, []);
+
+  const handleCreated = useCallback((property: CreatedPropertyMarker) => {
     mapRef.current?.addMarker(property);
-  }
+    setSelectedPropertyId(property.id);
+  }, []);
+
+  const handleUpdated = useCallback((property: CreatedPropertyMarker) => {
+    mapRef.current?.updateMarker(property);
+    setSelectedPropertyId(property.id);
+    setDetailRefreshToken((token) => token + 1);
+  }, []);
+
+  const handleDeleted = useCallback((propertyId: string) => {
+    mapRef.current?.removeMarker(propertyId);
+    setSelectedPropertyId(null);
+  }, []);
+
+  const handlePropertySelect = useCallback((propertyId: string) => {
+    setSelectedPropertyId(propertyId);
+  }, []);
+
+  const handleMapBackgroundClick = useCallback(() => {
+    setSelectedPropertyId(null);
+  }, []);
 
   return (
     <>
@@ -37,7 +76,7 @@ export default function MapPageClient() {
 
         <button
           type="button"
-          onClick={openModal}
+          onClick={openCreateModal}
           className="pointer-events-auto rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
         >
           Add Property
@@ -45,14 +84,28 @@ export default function MapPageClient() {
       </header>
 
       <div className="absolute inset-0">
-        <PropertyMap ref={mapRef} />
+        <PropertyMap
+          ref={mapRef}
+          onPropertySelect={handlePropertySelect}
+          onMapBackgroundClick={handleMapBackgroundClick}
+        />
       </div>
+
+      <PropertyDetailPanel
+        propertyId={selectedPropertyId}
+        onClose={() => setSelectedPropertyId(null)}
+        onEdit={openEditModal}
+        onDeleted={handleDeleted}
+        refreshToken={detailRefreshToken}
+      />
 
       <AddPropertyModal
         key={modalKey}
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={closeModal}
         onCreated={handleCreated}
+        onUpdated={handleUpdated}
+        propertyToEdit={propertyToEdit}
       />
     </>
   );

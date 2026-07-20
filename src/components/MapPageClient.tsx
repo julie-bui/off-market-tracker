@@ -69,6 +69,10 @@ export default function MapPageClient() {
     setSelectedPropertyId(null);
   }, []);
 
+  const handleViewExisting = useCallback((propertyId: string) => {
+    setSelectedPropertyId(propertyId);
+  }, []);
+
   return (
     <>
       <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-4 p-4 sm:p-6">
@@ -114,6 +118,7 @@ export default function MapPageClient() {
         onClose={closeModal}
         onCreated={handleCreated}
         onUpdated={handleUpdated}
+        onViewExisting={handleViewExisting}
         propertyToEdit={propertyToEdit}
         existingFiles={filesToEdit}
       />

@@ -52,7 +52,7 @@ export async function geocodeAddress(
 
   if (!feature) {
     throw new Error(
-      `No location found for “${trimmed}”. Try a fuller street address or postcode.`,
+      "Address not found — try adding more detail like postcode or building name.",
     );
   }
 
@@ -64,7 +64,7 @@ export async function geocodeAddress(
 
   if (!coords || coords.length < 2 || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) {
     throw new Error(
-      `No usable coordinates returned for “${trimmed}”. Try a different address.`,
+      "Address not found — try adding more detail like postcode or building name.",
     );
   }
 

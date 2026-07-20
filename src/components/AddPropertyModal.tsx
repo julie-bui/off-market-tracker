@@ -3,11 +3,13 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { geocodeAddress } from "@/lib/geocode";
+import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
 import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
   uploadPropertyImage,
   removePropertyFiles,
+  deletePropertyWithFiles,
 } from "@/lib/property-uploads";
 import type {
   Property,
@@ -22,6 +24,9 @@ const STATUSES: PropertyStatus[] = [
   "withdrawn",
 ];
 
+const ADDRESS_NOT_FOUND_MESSAGE =
+  "Address not found — try adding more detail like postcode or building name.";
+
 export type CreatedPropertyMarker = {
   id: string;
   address: string;
@@ -35,6 +40,8 @@ type AddPropertyModalProps = {
   onClose: () => void;
   onCreated: (property: CreatedPropertyMarker) => void;
   onUpdated?: (property: CreatedPropertyMarker) => void;
+  /** Open an existing property's detail panel (duplicate warning). */
+  onViewExisting?: (propertyId: string) => void;
   propertyToEdit?: Property | null;
   existingFiles?: PropertyFile[];
 };
@@ -51,6 +58,16 @@ type FormState = {
   agent_email: string;
   specs: string;
   notes: string;
+};
+
+type PendingUploadRetry = {
+  propertyId: string;
+  marker: CreatedPropertyMarker;
+  brochures: File[];
+  images: File[];
+  failedFileName: string;
+  /** When true, the property row was just inserted and can still be rolled back. */
+  canRollback: boolean;
 };
 
 const INITIAL_FORM: FormState = {
@@ -124,11 +141,23 @@ function statusLabel(status: PropertyStatus): string {
   return status.replaceAll("_", " ");
 }
 
+function uploadFailureMessage(fileName: string): string {
+  return `Failed to upload ${fileName} — please try again`;
+}
+
+function isGeocodeNotFoundError(message: string): boolean {
+  return (
+    message === ADDRESS_NOT_FOUND_MESSAGE ||
+    /no location found|no usable coordinates|address not found/i.test(message)
+  );
+}
+
 export default function AddPropertyModal({
   open,
   onClose,
   onCreated,
   onUpdated,
+  onViewExisting,
   propertyToEdit = null,
   existingFiles = [],
 }: AddPropertyModalProps) {
@@ -143,6 +172,12 @@ export default function AddPropertyModal({
   const [removedFiles, setRemovedFiles] = useState<PropertyFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<SimilarProperty | null>(null);
+  const [duplicateIgnored, setDuplicateIgnored] = useState(false);
+  const [uploadRetry, setUploadRetry] = useState<PendingUploadRetry | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -159,6 +194,11 @@ export default function AddPropertyModal({
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    if (key === "address" || key === "postcode") {
+      setAddressError(null);
+      setDuplicate(null);
+      setDuplicateIgnored(false);
+    }
   }
 
   function removeExistingFile(fileId: string) {
@@ -173,13 +213,123 @@ export default function AddPropertyModal({
   const keptBrochures = keptFiles.filter((file) => file.file_type === "brochure");
   const keptImages = keptFiles.filter((file) => file.file_type === "image");
 
+  async function attachFiles(
+    propertyId: string,
+    brochureFiles: File[],
+    imageFiles: File[],
+  ): Promise<{ remainingBrochures: File[]; remainingImages: File[] }> {
+    const remainingBrochures = [...brochureFiles];
+    const remainingImages = [...imageFiles];
+
+    while (remainingBrochures.length > 0) {
+      const brochureFile = remainingBrochures[0];
+      if (brochureFile.type !== "application/pdf") {
+        throw new Error(`Brochure “${brochureFile.name}” must be a PDF file.`);
+      }
+
+      try {
+        const brochureUrl = await uploadBrochure(
+          propertyId,
+          brochureFile,
+          brochureFiles.length - remainingBrochures.length,
+        );
+        const { error: brochureError } = await supabase
+          .from("property_files")
+          .insert({
+            property_id: propertyId,
+            file_url: brochureUrl,
+            file_type: "brochure",
+          });
+
+        if (brochureError) {
+          throw new Error(uploadFailureMessage(brochureFile.name));
+        }
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message.startsWith("Failed to upload ")
+        ) {
+          throw Object.assign(err, {
+            remainingBrochures,
+            remainingImages,
+            failedFileName: brochureFile.name,
+          });
+        }
+        throw Object.assign(new Error(uploadFailureMessage(brochureFile.name)), {
+          remainingBrochures,
+          remainingImages,
+          failedFileName: brochureFile.name,
+        });
+      }
+
+      remainingBrochures.shift();
+    }
+
+    while (remainingImages.length > 0) {
+      const imageFile = remainingImages[0];
+      if (!imageFile.type.startsWith("image/")) {
+        throw new Error(`“${imageFile.name}” is not an image file.`);
+      }
+
+      try {
+        const imageUrl = await uploadPropertyImage(
+          propertyId,
+          imageFile,
+          imageFiles.length - remainingImages.length,
+        );
+        const { error: imageError } = await supabase
+          .from("property_files")
+          .insert({
+            property_id: propertyId,
+            file_url: imageUrl,
+            file_type: "image",
+          });
+
+        if (imageError) {
+          throw new Error(uploadFailureMessage(imageFile.name));
+        }
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.message.startsWith("Failed to upload ")
+        ) {
+          throw Object.assign(err, {
+            remainingBrochures,
+            remainingImages,
+            failedFileName: imageFile.name,
+          });
+        }
+        throw Object.assign(new Error(uploadFailureMessage(imageFile.name)), {
+          remainingBrochures,
+          remainingImages,
+          failedFileName: imageFile.name,
+        });
+      }
+
+      remainingImages.shift();
+    }
+
+    return { remainingBrochures, remainingImages };
+  }
+
+  function finishSave(marker: CreatedPropertyMarker) {
+    if (isEditing) {
+      onUpdated?.(marker);
+    } else {
+      onCreated(marker);
+    }
+    onClose();
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setAddressError(null);
+    setUploadRetry(null);
 
     const address = form.address.trim();
     if (!address) {
-      setError("Address is required.");
+      setAddressError("Address is required.");
       return;
     }
 
@@ -191,16 +341,40 @@ export default function AddPropertyModal({
       return;
     }
 
-    const query = [address, form.postcode.trim()].filter(Boolean).join(", ");
+    const postcode = form.postcode.trim();
+    const query = [address, postcode].filter(Boolean).join(", ");
 
     setSubmitting(true);
 
+    let createdPropertyId: string | null = null;
+
     try {
-      const geocoded = await geocodeAddress(query, maptilerKey);
+      if (!isEditing && !duplicateIgnored) {
+        const similar = await findSimilarProperty({ address, postcode });
+        if (similar) {
+          setDuplicate(similar);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      let geocoded;
+      try {
+        geocoded = await geocodeAddress(query, maptilerKey);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : ADDRESS_NOT_FOUND_MESSAGE;
+        if (isGeocodeNotFoundError(message)) {
+          setAddressError(ADDRESS_NOT_FOUND_MESSAGE);
+          return;
+        }
+        setError(message);
+        return;
+      }
 
       const payload = {
         address,
-        postcode: form.postcode.trim() || null,
+        postcode: postcode || null,
         latitude: geocoded.latitude,
         longitude: geocoded.longitude,
         size_sqft: parseOptionalNumber(form.size_sqft),
@@ -235,65 +409,19 @@ export default function AddPropertyModal({
         );
       }
 
+      if (!isEditing) {
+        createdPropertyId = property.id;
+      }
+
       if (isEditing && removedFiles.length > 0) {
         await removePropertyFiles(removedFiles);
-      }
-
-      for (const [index, brochureFile] of brochures.entries()) {
-        if (brochureFile.type !== "application/pdf") {
-          throw new Error(`Brochure “${brochureFile.name}” must be a PDF file.`);
-        }
-
-        const brochureUrl = await uploadBrochure(
-          property.id,
-          brochureFile,
-          index,
-        );
-        const { error: brochureError } = await supabase
-          .from("property_files")
-          .insert({
-            property_id: property.id,
-            file_url: brochureUrl,
-            file_type: "brochure",
-          });
-
-        if (brochureError) {
-          throw new Error(
-            `Property saved, but brochure “${brochureFile.name}” failed: ${brochureError.message}`,
-          );
-        }
-      }
-
-      for (const [index, imageFile] of images.entries()) {
-        if (!imageFile.type.startsWith("image/")) {
-          throw new Error(`“${imageFile.name}” is not an image file.`);
-        }
-
-        const imageUrl = await uploadPropertyImage(
-          property.id,
-          imageFile,
-          index,
-        );
-        const { error: imageError } = await supabase
-          .from("property_files")
-          .insert({
-            property_id: property.id,
-            file_url: imageUrl,
-            file_type: "image",
-          });
-
-        if (imageError) {
-          throw new Error(
-            `Property saved, but image “${imageFile.name}” failed: ${imageError.message}`,
-          );
-        }
       }
 
       if (property.latitude == null || property.longitude == null) {
         throw new Error("Property saved without coordinates.");
       }
 
-      const markerPayload = {
+      const markerPayload: CreatedPropertyMarker = {
         id: property.id,
         address: property.address,
         latitude: property.latitude,
@@ -301,19 +429,148 @@ export default function AddPropertyModal({
         status: (property.status ?? form.status) as PropertyStatus,
       };
 
-      if (isEditing) {
+      try {
+        await attachFiles(property.id, brochures, images);
+      } catch (err) {
+        const failedFileName =
+          err && typeof err === "object" && "failedFileName" in err
+            ? String((err as { failedFileName: string }).failedFileName)
+            : "file";
+        const remainingBrochures =
+          err && typeof err === "object" && "remainingBrochures" in err
+            ? ((err as { remainingBrochures: File[] }).remainingBrochures ?? [])
+            : brochures;
+        const remainingImages =
+          err && typeof err === "object" && "remainingImages" in err
+            ? ((err as { remainingImages: File[] }).remainingImages ?? [])
+            : images;
+
+        const message = uploadFailureMessage(failedFileName);
+
+        if (!isEditing && createdPropertyId) {
+          // Roll back the new property so we never leave an incomplete record.
+          try {
+            await deletePropertyWithFiles(createdPropertyId);
+          } catch (rollbackError) {
+            console.error("Failed to roll back property after upload error", rollbackError);
+            setUploadRetry({
+              propertyId: createdPropertyId,
+              marker: markerPayload,
+              brochures: remainingBrochures,
+              images: remainingImages,
+              failedFileName,
+              canRollback: false,
+            });
+            setBrochures(remainingBrochures);
+            setImages(remainingImages);
+            setError(
+              `${message}. The property was saved but one or more files were not attached.`,
+            );
+            return;
+          }
+
+          setBrochures(remainingBrochures);
+          setImages(remainingImages);
+          setError(message);
+          return;
+        }
+
+        // Edit flow: property fields are already saved — offer retry for remaining files.
+        setUploadRetry({
+          propertyId: property.id,
+          marker: markerPayload,
+          brochures: remainingBrochures,
+          images: remainingImages,
+          failedFileName,
+          canRollback: false,
+        });
+        setBrochures(remainingBrochures);
+        setImages(remainingImages);
         onUpdated?.(markerPayload);
-      } else {
-        onCreated(markerPayload);
+        setError(
+          `${message}. Your property details were saved, but one or more files were not attached.`,
+        );
+        return;
       }
-      onClose();
+
+      finishSave(markerPayload);
     } catch (err) {
+      if (createdPropertyId) {
+        try {
+          await deletePropertyWithFiles(createdPropertyId);
+        } catch (rollbackError) {
+          console.error("Failed to roll back property after save error", rollbackError);
+        }
+      }
       const message =
         err instanceof Error ? err.message : "Something went wrong while saving.";
       setError(message);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleRetryUploads() {
+    if (!uploadRetry) return;
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await attachFiles(
+        uploadRetry.propertyId,
+        uploadRetry.brochures,
+        uploadRetry.images,
+      );
+      setBrochures([]);
+      setImages([]);
+      setUploadRetry(null);
+      finishSave(uploadRetry.marker);
+    } catch (err) {
+      const failedFileName =
+        err && typeof err === "object" && "failedFileName" in err
+          ? String((err as { failedFileName: string }).failedFileName)
+          : uploadRetry.failedFileName;
+      const remainingBrochures =
+        err && typeof err === "object" && "remainingBrochures" in err
+          ? ((err as { remainingBrochures: File[] }).remainingBrochures ?? [])
+          : uploadRetry.brochures;
+      const remainingImages =
+        err && typeof err === "object" && "remainingImages" in err
+          ? ((err as { remainingImages: File[] }).remainingImages ?? [])
+          : uploadRetry.images;
+
+      setUploadRetry({
+        ...uploadRetry,
+        brochures: remainingBrochures,
+        images: remainingImages,
+        failedFileName,
+      });
+      setBrochures(remainingBrochures);
+      setImages(remainingImages);
+      setError(uploadFailureMessage(failedFileName));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleContinueDespiteDuplicate() {
+    setDuplicateIgnored(true);
+    setDuplicate(null);
+    // Re-submit programmatically after acknowledging the warning.
+    queueMicrotask(() => {
+      const formEl = document.getElementById(
+        "add-property-form",
+      ) as HTMLFormElement | null;
+      formEl?.requestSubmit();
+    });
+  }
+
+  function handleViewExistingDuplicate() {
+    if (!duplicate) return;
+    const id = duplicate.id;
+    onClose();
+    onViewExisting?.(id);
   }
 
   if (!open) return null;
@@ -357,14 +614,70 @@ export default function AddPropertyModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+        <form
+          id="add-property-form"
+          onSubmit={handleSubmit}
+          className="flex min-h-0 flex-1 flex-col"
+        >
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             {error ? (
               <div
                 role="alert"
-                className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                className="space-y-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
               >
-                {error}
+                <p>{error}</p>
+                {uploadRetry ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleRetryUploads()}
+                    disabled={submitting}
+                    className="rounded-md bg-red-800 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-900 disabled:opacity-60"
+                  >
+                    {submitting
+                      ? "Retrying…"
+                      : `Retry failed upload (${uploadRetry.failedFileName})`}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
+            {duplicate ? (
+              <div
+                role="status"
+                className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+              >
+                <p>
+                  A similar property already exists: {duplicate.address}
+                  {duplicate.postcode ? ` (${duplicate.postcode})` : ""} — do
+                  you want to continue adding this as a new entry, or view the
+                  existing one?
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleContinueDespiteDuplicate}
+                    disabled={submitting}
+                    className="rounded-md bg-amber-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-60"
+                  >
+                    Continue anyway
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleViewExistingDuplicate}
+                    disabled={submitting}
+                    className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    View existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDuplicate(null)}
+                    disabled={submitting}
+                    className="rounded-md px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             ) : null}
 
@@ -377,7 +690,13 @@ export default function AddPropertyModal({
                   required
                   value={form.address}
                   onChange={(e) => updateField("address", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                  aria-invalid={addressError != null}
+                  className={[
+                    "w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-zinc-500",
+                    addressError
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-zinc-300",
+                  ].join(" ")}
                   placeholder="123 Example Street, London"
                 />
               </label>
@@ -389,7 +708,13 @@ export default function AddPropertyModal({
                 <input
                   value={form.postcode}
                   onChange={(e) => updateField("postcode", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                  aria-invalid={addressError != null}
+                  className={[
+                    "w-full rounded-md border px-3 py-2 text-sm outline-none focus:border-zinc-500",
+                    addressError
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-zinc-300",
+                  ].join(" ")}
                   placeholder="EC2A 4BX"
                 />
               </label>
@@ -412,6 +737,15 @@ export default function AddPropertyModal({
                   ))}
                 </select>
               </label>
+
+              {addressError ? (
+                <p
+                  role="alert"
+                  className="sm:col-span-2 -mt-2 text-sm text-red-700"
+                >
+                  {addressError}
+                </p>
+              ) : null}
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
@@ -599,6 +933,7 @@ export default function AddPropertyModal({
                   multiple
                   onChange={(e) => {
                     setBrochures(Array.from(e.target.files ?? []));
+                    setUploadRetry(null);
                     e.target.value = "";
                   }}
                   className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
@@ -650,6 +985,7 @@ export default function AddPropertyModal({
                   multiple
                   onChange={(e) => {
                     setImages(Array.from(e.target.files ?? []));
+                    setUploadRetry(null);
                     e.target.value = "";
                   }}
                   className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
@@ -698,7 +1034,7 @@ export default function AddPropertyModal({
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || duplicate != null}
               className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving…" : isEditing ? "Save changes" : "Save property"}

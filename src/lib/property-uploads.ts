@@ -49,7 +49,7 @@ async function uploadPublicFile(
   });
 
   if (error) {
-    throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+    throw new Error(`Failed to upload ${file.name} — please try again`);
   }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);

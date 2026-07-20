@@ -67,6 +67,6 @@ supabase/
 
 ## Schema overview
 
-**`properties`** — address, postcode, lat/lng, sector (`office` / `retail` / `industrial` / `residential` / `mixed-use`), size & pricing, availability, status (`available` / `under_offer` / `let` / `withdrawn`), tenure, lease length, agent contacts, specs (JSONB), notes, timestamps.
+**`properties`** — address, postcode, lat/lng, sector (`office` / `retail` / `industrial` / `residential` / `mixed-use`), size & pricing, availability, status (`available` / `under_offer` / `let` / `withdrawn`), tenure, lease length, agent contacts, specs (plain text), notes, timestamps.
 
 **`property_files`** — `property_id` FK, `file_url`, `file_type` (`brochure` / `image`).

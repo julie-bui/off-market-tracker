@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
@@ -18,17 +12,8 @@ import {
 import type {
   Property,
   PropertyFile,
-  PropertySector,
   PropertyStatus,
 } from "@/types/database";
-
-const SECTORS: PropertySector[] = [
-  "office",
-  "retail",
-  "industrial",
-  "residential",
-  "mixed-use",
-];
 
 const STATUSES: PropertyStatus[] = [
   "available",
@@ -36,9 +21,6 @@ const STATUSES: PropertyStatus[] = [
   "let",
   "withdrawn",
 ];
-
-const TENURES = ["freehold", "leasehold"] as const;
-type Tenure = (typeof TENURES)[number];
 
 export type CreatedPropertyMarker = {
   id: string;
@@ -60,13 +42,10 @@ type AddPropertyModalProps = {
 type FormState = {
   address: string;
   postcode: string;
-  sector: PropertySector | "";
   size_sqft: string;
   cost_per_sqft: string;
   availability_period: string;
   status: PropertyStatus;
-  tenure: Tenure | "";
-  lease_length: string;
   agent_name: string;
   agent_phone: string;
   agent_email: string;
@@ -77,13 +56,10 @@ type FormState = {
 const INITIAL_FORM: FormState = {
   address: "",
   postcode: "",
-  sector: "",
   size_sqft: "",
   cost_per_sqft: "",
   availability_period: "",
   status: "available",
-  tenure: "",
-  lease_length: "",
   agent_name: "",
   agent_phone: "",
   agent_email: "",
@@ -121,22 +97,14 @@ function specsToText(specs: Property["specs"] | unknown): string {
 }
 
 function propertyToFormState(property: Property): FormState {
-  const tenure: Tenure | "" =
-    property.tenure === "freehold" || property.tenure === "leasehold"
-      ? property.tenure
-      : "";
-
   return {
     address: property.address,
     postcode: property.postcode ?? "",
-    sector: property.sector ?? "",
     size_sqft: property.size_sqft != null ? String(property.size_sqft) : "",
     cost_per_sqft:
       property.cost_per_sqft != null ? String(property.cost_per_sqft) : "",
     availability_period: property.availability_period ?? "",
     status: property.status,
-    tenure,
-    lease_length: property.lease_length ?? "",
     agent_name: property.agent_name ?? "",
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
@@ -150,14 +118,6 @@ function parseOptionalNumber(value: string): number | null {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function statusLabel(status: PropertyStatus): string {
@@ -177,7 +137,7 @@ export default function AddPropertyModal({
   const [form, setForm] = useState<FormState>(() =>
     propertyToEdit ? propertyToFormState(propertyToEdit) : INITIAL_FORM,
   );
-  const [brochure, setBrochure] = useState<File | null>(null);
+  const [brochures, setBrochures] = useState<File[]>([]);
   const [images, setImages] = useState<File[]>([]);
   const [keptFiles, setKeptFiles] = useState<PropertyFile[]>(existingFiles);
   const [removedFiles, setRemovedFiles] = useState<PropertyFile[]>([]);
@@ -196,13 +156,6 @@ export default function AddPropertyModal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose, submitting]);
-
-  const totalPrice = useMemo(() => {
-    const size = parseOptionalNumber(form.size_sqft);
-    const cost = parseOptionalNumber(form.cost_per_sqft);
-    if (size == null || cost == null) return null;
-    return size * cost;
-  }, [form.size_sqft, form.cost_per_sqft]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -245,24 +198,15 @@ export default function AddPropertyModal({
     try {
       const geocoded = await geocodeAddress(query, maptilerKey);
 
-      const sizeSqft = parseOptionalNumber(form.size_sqft);
-      const costPerSqft = parseOptionalNumber(form.cost_per_sqft);
-      const tenure = form.tenure || null;
-      const leaseLength =
-        tenure === "leasehold" ? form.lease_length.trim() || null : null;
-
       const payload = {
         address,
         postcode: form.postcode.trim() || null,
         latitude: geocoded.latitude,
         longitude: geocoded.longitude,
-        sector: form.sector || null,
-        size_sqft: sizeSqft,
-        cost_per_sqft: costPerSqft,
+        size_sqft: parseOptionalNumber(form.size_sqft),
+        cost_per_sqft: parseOptionalNumber(form.cost_per_sqft),
         availability_period: form.availability_period.trim() || null,
         status: form.status,
-        tenure,
-        lease_length: leaseLength,
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
@@ -295,11 +239,16 @@ export default function AddPropertyModal({
         await removePropertyFiles(removedFiles);
       }
 
-      if (brochure) {
-        if (brochure.type !== "application/pdf") {
-          throw new Error("Brochure must be a PDF file.");
+      for (const [index, brochureFile] of brochures.entries()) {
+        if (brochureFile.type !== "application/pdf") {
+          throw new Error(`Brochure “${brochureFile.name}” must be a PDF file.`);
         }
-        const brochureUrl = await uploadBrochure(property.id, brochure);
+
+        const brochureUrl = await uploadBrochure(
+          property.id,
+          brochureFile,
+          index,
+        );
         const { error: brochureError } = await supabase
           .from("property_files")
           .insert({
@@ -310,12 +259,11 @@ export default function AddPropertyModal({
 
         if (brochureError) {
           throw new Error(
-            `Property saved, but brochure upload failed: ${brochureError.message}`,
+            `Property saved, but brochure “${brochureFile.name}” failed: ${brochureError.message}`,
           );
         }
       }
 
-      // Upload each selected image individually and create one property_files row each
       for (const [index, imageFile] of images.entries()) {
         if (!imageFile.type.startsWith("image/")) {
           throw new Error(`“${imageFile.name}” is not an image file.`);
@@ -409,10 +357,7 @@ export default function AddPropertyModal({
           </button>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
             {error ? (
               <div
@@ -451,19 +396,18 @@ export default function AddPropertyModal({
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Sector
+                  Status
                 </span>
                 <select
-                  value={form.sector}
+                  value={form.status}
                   onChange={(e) =>
-                    updateField("sector", e.target.value as PropertySector | "")
+                    updateField("status", e.target.value as PropertyStatus)
                   }
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 >
-                  <option value="">Select sector</option>
-                  {SECTORS.map((sector) => (
-                    <option key={sector} value={sector}>
-                      {sector}
+                  {STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel(status)}
                     </option>
                   ))}
                 </select>
@@ -497,19 +441,7 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <div className="rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 sm:col-span-2">
-                <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
-                  Total price
-                </p>
-                <p className="mt-1 text-base font-semibold text-zinc-900">
-                  {totalPrice == null ? "—" : formatCurrency(totalPrice)}
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-500">
-                  size_sqft × cost_per_sqft
-                </p>
-              </div>
-
-              <label className="block">
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Availability period
                 </span>
@@ -522,59 +454,6 @@ export default function AddPropertyModal({
                   placeholder="H2 2027"
                 />
               </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Status
-                </span>
-                <select
-                  value={form.status}
-                  onChange={(e) =>
-                    updateField("status", e.target.value as PropertyStatus)
-                  }
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                >
-                  {STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {statusLabel(status)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Tenure
-                </span>
-                <select
-                  value={form.tenure}
-                  onChange={(e) =>
-                    updateField("tenure", e.target.value as Tenure | "")
-                  }
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                >
-                  <option value="">Select tenure</option>
-                  {TENURES.map((tenure) => (
-                    <option key={tenure} value={tenure}>
-                      {tenure}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {form.tenure === "leasehold" ? (
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-zinc-700">
-                    Lease length
-                  </span>
-                  <input
-                    value={form.lease_length}
-                    onChange={(e) => updateField("lease_length", e.target.value)}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                    placeholder="10 years"
-                  />
-                </label>
-              ) : null}
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
@@ -644,7 +523,7 @@ export default function AddPropertyModal({
                       <p className="text-sm text-zinc-500">No brochures attached.</p>
                     ) : (
                       <ul className="space-y-2">
-                        {keptBrochures.map((file) => (
+                        {keptBrochures.map((file, index) => (
                           <li
                             key={file.id}
                             className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
@@ -655,7 +534,7 @@ export default function AddPropertyModal({
                               rel="noopener noreferrer"
                               className="truncate text-sm text-zinc-800 underline decoration-zinc-300 underline-offset-2"
                             >
-                              Brochure PDF
+                              Brochure {index + 1}
                             </a>
                             <button
                               type="button"
@@ -706,19 +585,57 @@ export default function AddPropertyModal({
                 </div>
               ) : null}
 
-              <label className="block sm:col-span-2">
+              <div className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  {isEditing ? "Add brochure (PDF)" : "Brochure (PDF)"}
+                  {isEditing ? "Add brochures (PDF)" : "Brochures (PDF)"}
+                </span>
+                <span className="mb-2 block text-xs text-zinc-500">
+                  You can select multiple PDF brochures at once.
                 </span>
                 <input
                   type="file"
+                  name="brochures"
                   accept="application/pdf,.pdf"
-                  onChange={(e) => setBrochure(e.target.files?.[0] ?? null)}
+                  multiple
+                  onChange={(e) => {
+                    setBrochures(Array.from(e.target.files ?? []));
+                    e.target.value = "";
+                  }}
                   className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
                 />
-              </label>
+                {brochures.length > 0 ? (
+                  <ul className="mt-3 space-y-2">
+                    <li className="text-xs text-zinc-500">
+                      {brochures.length} brochure
+                      {brochures.length === 1 ? "" : "s"} selected
+                    </li>
+                    {brochures.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      >
+                        <span className="truncate text-sm text-zinc-800">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBrochures((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                          className="rounded-md px-2 py-0.5 text-sm text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
 
-              <label className="block sm:col-span-2">
+              <div className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   {isEditing ? "Add images" : "Images"}
                 </span>
@@ -732,9 +649,7 @@ export default function AddPropertyModal({
                   accept="image/jpeg,image/png,image/webp,image/gif,image/*"
                   multiple
                   onChange={(e) => {
-                    const selected = Array.from(e.target.files ?? []);
-                    setImages(selected);
-                    // Allow selecting the same files again later
+                    setImages(Array.from(e.target.files ?? []));
                     e.target.value = "";
                   }}
                   className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
@@ -768,7 +683,7 @@ export default function AddPropertyModal({
                     ))}
                   </ul>
                 ) : null}
-              </label>
+              </div>
             </div>
           </div>
 

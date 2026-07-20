@@ -1,10 +1,3 @@
-export type PropertySector =
-  | "office"
-  | "retail"
-  | "industrial"
-  | "residential"
-  | "mixed-use";
-
 export type PropertyStatus =
   | "available"
   | "under_offer"
@@ -31,14 +24,10 @@ export type Database = {
           postcode: string | null;
           latitude: number | null;
           longitude: number | null;
-          sector: PropertySector | null;
           size_sqft: number | null;
           cost_per_sqft: number | null;
-          total_price: number | null;
           availability_period: string | null;
           status: PropertyStatus;
-          tenure: string | null;
-          lease_length: string | null;
           agent_name: string | null;
           agent_phone: string | null;
           agent_email: string | null;
@@ -53,13 +42,10 @@ export type Database = {
           postcode?: string | null;
           latitude?: number | null;
           longitude?: number | null;
-          sector?: PropertySector | null;
           size_sqft?: number | null;
           cost_per_sqft?: number | null;
           availability_period?: string | null;
           status?: PropertyStatus;
-          tenure?: string | null;
-          lease_length?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;
@@ -74,13 +60,10 @@ export type Database = {
           postcode?: string | null;
           latitude?: number | null;
           longitude?: number | null;
-          sector?: PropertySector | null;
           size_sqft?: number | null;
           cost_per_sqft?: number | null;
           availability_period?: string | null;
           status?: PropertyStatus;
-          tenure?: string | null;
-          lease_length?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;
@@ -127,7 +110,6 @@ export type Database = {
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: {
-      property_sector: PropertySector;
       property_status: PropertyStatus;
       property_file_type: PropertyFileType;
     };

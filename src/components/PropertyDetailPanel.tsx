@@ -234,7 +234,6 @@ function PropertyDetailContent({
             <dl>
               <DetailRow label="Address" value={property.address} />
               <DetailRow label="Postcode" value={property.postcode ?? "—"} />
-              <DetailRow label="Sector" value={formatLabel(property.sector)} />
               <DetailRow
                 label="Size (sq ft)"
                 value={formatNumber(property.size_sqft)}
@@ -244,21 +243,10 @@ function PropertyDetailContent({
                 value={formatCurrency(property.cost_per_sqft)}
               />
               <DetailRow
-                label="Total price"
-                value={formatCurrency(property.total_price)}
-              />
-              <DetailRow
                 label="Availability"
                 value={property.availability_period ?? "—"}
               />
               <DetailRow label="Status" value={formatLabel(property.status)} />
-              <DetailRow label="Tenure" value={formatLabel(property.tenure)} />
-              {property.tenure === "leasehold" || property.lease_length ? (
-                <DetailRow
-                  label="Lease length"
-                  value={property.lease_length ?? "—"}
-                />
-              ) : null}
               <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
               <DetailRow
                 label="Agent phone"
@@ -336,25 +324,32 @@ function PropertyDetailContent({
             </section>
 
             <section className="mt-5">
-              <h3 className="text-sm font-semibold text-zinc-900">Brochure</h3>
+              <h3 className="text-sm font-semibold text-zinc-900">Brochures</h3>
               {brochures.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-500">No brochure attached.</p>
+                <p className="mt-2 text-sm text-zinc-500">No brochures attached.</p>
               ) : (
-                <ul className="mt-2 space-y-2">
-                  {brochures.map((brochure, index) => (
-                    <li key={brochure.id}>
-                      <a
-                        href={brochure.file_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700"
-                      >
-                        View / download brochure
-                        {brochures.length > 1 ? ` ${index + 1}` : ""}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="mt-2 space-y-2">
+                    {brochures.map((brochure, index) => (
+                      <li key={brochure.id}>
+                        <a
+                          href={brochure.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700"
+                        >
+                          View / download brochure
+                          {brochures.length > 1 ? ` ${index + 1}` : ""}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                  {brochures.length > 1 ? (
+                    <p className="mt-2 text-xs text-zinc-500">
+                      {brochures.length} brochures
+                    </p>
+                  ) : null}
+                </>
               )}
             </section>
           </>

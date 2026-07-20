@@ -59,8 +59,9 @@ async function uploadPublicFile(
 export async function uploadBrochure(
   propertyId: string,
   file: File,
+  index = 0,
 ): Promise<string> {
-  const path = `${propertyId}/brochure-${Date.now()}-${sanitizeFileName(file.name)}`;
+  const path = `${propertyId}/brochure-${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
   return uploadPublicFile(STORAGE_BUCKETS.brochures, path, file);
 }
 

@@ -5,14 +5,6 @@
 -- Enums
 -- ---------------------------------------------------------------------------
 
-create type public.property_sector as enum (
-  'office',
-  'retail',
-  'industrial',
-  'residential',
-  'mixed-use'
-);
-
 create type public.property_status as enum (
   'available',
   'under_offer',
@@ -35,14 +27,10 @@ create table public.properties (
   postcode text,
   latitude double precision,
   longitude double precision,
-  sector public.property_sector,
   size_sqft numeric,
   cost_per_sqft numeric,
-  total_price numeric generated always as (size_sqft * cost_per_sqft) stored,
   availability_period text,
   status public.property_status not null default 'available',
-  tenure text,
-  lease_length text,
   agent_name text,
   agent_phone text,
   agent_email text,
@@ -63,7 +51,6 @@ create table public.property_files (
 create index property_files_property_id_idx on public.property_files (property_id);
 create index property_files_file_type_idx on public.property_files (file_type);
 create index properties_status_idx on public.properties (status);
-create index properties_sector_idx on public.properties (sector);
 create index properties_postcode_idx on public.properties (postcode);
 
 -- Keep last_updated_at in sync on row updates

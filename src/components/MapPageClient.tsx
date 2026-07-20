@@ -71,23 +71,25 @@ export default function MapPageClient() {
 
   return (
     <>
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
-        <div className="pointer-events-auto rounded-md bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
-          <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
-            Off-Market Tracker
-          </p>
-          <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-zinc-900">
-            London properties
-          </h1>
-        </div>
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-4 p-4 sm:p-6">
+        <div className="pointer-events-auto flex flex-col items-start gap-3">
+          <div className="rounded-md bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
+            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+              Off-Market Tracker
+            </p>
+            <h1 className="mt-0.5 text-lg font-semibold tracking-tight text-zinc-900">
+              London properties
+            </h1>
+          </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="pointer-events-auto rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
-        >
-          Add Property
-        </button>
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-800"
+          >
+            Add Property
+          </button>
+        </div>
       </header>
 
       <div className="absolute inset-0">

@@ -10,24 +10,16 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { supabase } from "@/lib/supabase";
-import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
 const DEFAULT_ZOOM = 11;
-
-const STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
-  available: "#16a34a", // green
-  under_offer: "#d97706", // amber
-  let: "#6b7280", // gray
-  withdrawn: "#6b7280", // gray
-};
+const PIN_COLOR = "#6b7280"; // consistent grey for all pins
 
 export type PropertyMarkerData = {
   id: string;
   address: string;
   latitude: number;
   longitude: number;
-  status?: PropertyStatus | null;
 };
 
 export type PropertyMapHandle = {
@@ -46,7 +38,6 @@ type PropertyMarkerRow = {
   address: string;
   latitude: number | null;
   longitude: number | null;
-  status: PropertyStatus | null;
 };
 
 /** Transit / transport layers should stay visible even if they look POI-like. */
@@ -107,11 +98,6 @@ function hidePoiLayers(map: maplibregl.Map) {
   }
 }
 
-function pinColorForStatus(status?: PropertyStatus | null): string {
-  if (!status) return STATUS_PIN_COLORS.available;
-  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.available;
-}
-
 /** Teardrop pin SVG — tip is at the bottom center of the viewBox. */
 function createPinSvg(fill: string): string {
   return `
@@ -136,8 +122,7 @@ function createMarkerElement(
   el.className = "property-map-marker";
   el.title = property.address;
   el.setAttribute("aria-label", `View ${property.address}`);
-  el.dataset.status = property.status ?? "available";
-  el.innerHTML = createPinSvg(pinColorForStatus(property.status));
+  el.innerHTML = createPinSvg(PIN_COLOR);
   el.addEventListener("click", (event) => {
     event.stopPropagation();
     onSelect(property.id);
@@ -255,7 +240,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
         void (async () => {
           const { data, error } = await supabase
             .from("properties")
-            .select("id, address, latitude, longitude, status");
+            .select("id, address, latitude, longitude");
 
           if (signal.cancelled) return;
 
@@ -277,7 +262,6 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
                 address: property.address,
                 latitude: property.latitude,
                 longitude: property.longitude,
-                status: property.status,
               },
               selectProperty,
             );

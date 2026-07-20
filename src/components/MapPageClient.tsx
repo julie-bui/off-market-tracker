@@ -119,7 +119,7 @@ export default function MapPageClient() {
           type="button"
           onClick={() => void handleLogout()}
           disabled={loggingOut}
-          className="pointer-events-auto absolute top-4 right-[100px] z-10 rounded-md bg-white/90 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-60 sm:top-6"
+          className="pointer-events-auto absolute top-4 right-4 z-10 rounded-md bg-white/90 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-60 sm:top-6 sm:right-6"
         >
           {loggingOut ? "Logging out…" : "Log out"}
         </button>

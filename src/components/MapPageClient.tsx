@@ -9,13 +9,14 @@ import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import PropertyMap, {
   type PropertyMapHandle,
 } from "@/components/PropertyMap";
-import type { Property } from "@/types/database";
+import type { Property, PropertyFile } from "@/types/database";
 
 export default function MapPageClient() {
   const mapRef = useRef<PropertyMapHandle>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKey, setModalKey] = useState(0);
   const [propertyToEdit, setPropertyToEdit] = useState<Property | null>(null);
+  const [filesToEdit, setFilesToEdit] = useState<PropertyFile[]>([]);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
     null,
   );
@@ -23,19 +24,25 @@ export default function MapPageClient() {
 
   const openCreateModal = useCallback(() => {
     setPropertyToEdit(null);
+    setFilesToEdit([]);
     setModalKey((key) => key + 1);
     setModalOpen(true);
   }, []);
 
-  const openEditModal = useCallback((property: Property) => {
-    setPropertyToEdit(property);
-    setModalKey((key) => key + 1);
-    setModalOpen(true);
-  }, []);
+  const openEditModal = useCallback(
+    (property: Property, files: PropertyFile[]) => {
+      setPropertyToEdit(property);
+      setFilesToEdit(files);
+      setModalKey((key) => key + 1);
+      setModalOpen(true);
+    },
+    [],
+  );
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
     setPropertyToEdit(null);
+    setFilesToEdit([]);
   }, []);
 
   const handleCreated = useCallback((property: CreatedPropertyMarker) => {
@@ -106,6 +113,7 @@ export default function MapPageClient() {
         onCreated={handleCreated}
         onUpdated={handleUpdated}
         propertyToEdit={propertyToEdit}
+        existingFiles={filesToEdit}
       />
     </>
   );

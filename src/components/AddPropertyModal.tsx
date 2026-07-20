@@ -13,9 +13,11 @@ import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
   uploadPropertyImages,
+  removePropertyFiles,
 } from "@/lib/property-uploads";
 import type {
   Property,
+  PropertyFile,
   PropertySector,
   PropertyStatus,
 } from "@/types/database";
@@ -51,6 +53,7 @@ type AddPropertyModalProps = {
   onCreated: (property: CreatedPropertyMarker) => void;
   onUpdated?: (property: CreatedPropertyMarker) => void;
   propertyToEdit?: Property | null;
+  existingFiles?: PropertyFile[];
 };
 
 type FormState = {
@@ -148,6 +151,7 @@ export default function AddPropertyModal({
   onCreated,
   onUpdated,
   propertyToEdit = null,
+  existingFiles = [],
 }: AddPropertyModalProps) {
   const isEditing = propertyToEdit != null;
   const titleId = useId();
@@ -156,6 +160,8 @@ export default function AddPropertyModal({
   );
   const [brochure, setBrochure] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
+  const [keptFiles, setKeptFiles] = useState<PropertyFile[]>(existingFiles);
+  const [removedFiles, setRemovedFiles] = useState<PropertyFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -182,6 +188,18 @@ export default function AddPropertyModal({
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
   }
+
+  function removeExistingFile(fileId: string) {
+    const target = keptFiles.find((file) => file.id === fileId);
+    if (!target) return;
+    setKeptFiles((current) => current.filter((file) => file.id !== fileId));
+    setRemovedFiles((removed) =>
+      removed.some((file) => file.id === fileId) ? removed : [...removed, target],
+    );
+  }
+
+  const keptBrochures = keptFiles.filter((file) => file.file_type === "brochure");
+  const keptImages = keptFiles.filter((file) => file.file_type === "image");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -252,6 +270,10 @@ export default function AddPropertyModal({
         throw new Error(
           saveError?.message ?? "Failed to save the property record.",
         );
+      }
+
+      if (isEditing && removedFiles.length > 0) {
+        await removePropertyFiles(removedFiles);
       }
 
       const fileRows: Array<{
@@ -587,9 +609,81 @@ export default function AddPropertyModal({
                 />
               </label>
 
+              {isEditing ? (
+                <div className="space-y-3 sm:col-span-2">
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-zinc-700">
+                      Existing brochures
+                    </p>
+                    {keptBrochures.length === 0 ? (
+                      <p className="text-sm text-zinc-500">No brochures attached.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {keptBrochures.map((file) => (
+                          <li
+                            key={file.id}
+                            className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                          >
+                            <a
+                              href={file.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate text-sm text-zinc-800 underline decoration-zinc-300 underline-offset-2"
+                            >
+                              Brochure PDF
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => removeExistingFile(file.id)}
+                              className="rounded-md px-2 py-0.5 text-sm text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900"
+                              aria-label="Remove brochure"
+                            >
+                              ✕
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-zinc-700">
+                      Existing images
+                    </p>
+                    {keptImages.length === 0 ? (
+                      <p className="text-sm text-zinc-500">No images attached.</p>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {keptImages.map((file) => (
+                          <div
+                            key={file.id}
+                            className="relative aspect-square overflow-hidden rounded-md border border-zinc-200 bg-zinc-100"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={file.file_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeExistingFile(file.id)}
+                              className="absolute top-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white hover:bg-black"
+                              aria-label="Remove image"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Brochure (PDF){isEditing ? " — add another" : ""}
+                  {isEditing ? "Add brochure (PDF)" : "Brochure (PDF)"}
                 </span>
                 <input
                   type="file"
@@ -601,7 +695,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Images{isEditing ? " — add more" : ""}
+                  {isEditing ? "Add images" : "Images"}
                 </span>
                 <input
                   type="file"
@@ -614,7 +708,7 @@ export default function AddPropertyModal({
                 />
                 {images.length > 0 ? (
                   <p className="mt-1 text-xs text-zinc-500">
-                    {images.length} image{images.length === 1 ? "" : "s"} selected
+                    {images.length} new image{images.length === 1 ? "" : "s"} selected
                   </p>
                 ) : null}
               </label>

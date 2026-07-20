@@ -3,12 +3,13 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import { supabase } from "@/lib/supabase";
+import { deletePropertyWithFiles } from "@/lib/property-uploads";
 import type { Property, PropertyFile } from "@/types/database";
 
 type PropertyDetailPanelProps = {
   propertyId: string | null;
   onClose: () => void;
-  onEdit: (property: Property) => void;
+  onEdit: (property: Property, files: PropertyFile[]) => void;
   onDeleted: (propertyId: string) => void;
   /** Bump to force a refresh after an edit save */
   refreshToken?: number;
@@ -74,7 +75,7 @@ function DetailRow({
 type PropertyDetailContentProps = {
   propertyId: string;
   onClose: () => void;
-  onEdit: (property: Property) => void;
+  onEdit: (property: Property, files: PropertyFile[]) => void;
   onDeleted: (propertyId: string) => void;
   refreshToken: number;
 };
@@ -148,26 +149,22 @@ function PropertyDetailContent({
     if (!property) return;
 
     const confirmed = window.confirm(
-      `Delete “${property.address}”? This cannot be undone.`,
+      `Delete “${property.address}”? This removes the property and its files from storage. This cannot be undone.`,
     );
     if (!confirmed) return;
 
     setDeleting(true);
     setError(null);
 
-    const { error: deleteError } = await supabase
-      .from("properties")
-      .delete()
-      .eq("id", propertyId);
-
-    setDeleting(false);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      return;
+    try {
+      await deletePropertyWithFiles(propertyId);
+      onDeleted(propertyId);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to delete this property.",
+      );
+      setDeleting(false);
     }
-
-    onDeleted(propertyId);
   }
 
   const images = files.filter((file) => file.file_type === "image");
@@ -337,7 +334,7 @@ function PropertyDetailContent({
         <div className="flex gap-2 border-t border-zinc-200 bg-zinc-50 px-4 py-3">
           <button
             type="button"
-            onClick={() => onEdit(property)}
+            onClick={() => onEdit(property, files)}
             disabled={deleting}
             className="flex-1 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
           >

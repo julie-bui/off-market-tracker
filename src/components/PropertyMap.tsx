@@ -12,7 +12,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { supabase } from "@/lib/supabase";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
-const DEFAULT_ZOOM = 11;
+const DEFAULT_ZOOM = 13;
 const PIN_COLOR = "#6b7280"; // consistent grey for all pins
 
 export type PropertyMarkerData = {

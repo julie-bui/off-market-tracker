@@ -10,16 +10,24 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { supabase } from "@/lib/supabase";
+import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
 const DEFAULT_ZOOM = 15;
-const PIN_COLOR = "#6b7280"; // consistent grey for all pins
+
+const STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
+  available: "#16a34a", // green
+  under_offer: "#d97706", // amber
+  let: "#6b7280", // gray
+  withdrawn: "#6b7280", // gray
+};
 
 export type PropertyMarkerData = {
   id: string;
   address: string;
   latitude: number;
   longitude: number;
+  status?: PropertyStatus | null;
 };
 
 export type PropertyMapHandle = {
@@ -38,6 +46,7 @@ type PropertyMarkerRow = {
   address: string;
   latitude: number | null;
   longitude: number | null;
+  status: PropertyStatus | null;
 };
 
 /** Transit / transport layers should stay visible even if they look POI-like. */

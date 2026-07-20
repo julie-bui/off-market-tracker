@@ -12,7 +12,7 @@ import { geocodeAddress } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
-  uploadPropertyImages,
+  uploadPropertyImage,
   removePropertyFiles,
 } from "@/lib/property-uploads";
 import type {
@@ -295,43 +295,48 @@ export default function AddPropertyModal({
         await removePropertyFiles(removedFiles);
       }
 
-      const fileRows: Array<{
-        property_id: string;
-        file_url: string;
-        file_type: "brochure" | "image";
-      }> = [];
-
       if (brochure) {
         if (brochure.type !== "application/pdf") {
           throw new Error("Brochure must be a PDF file.");
         }
         const brochureUrl = await uploadBrochure(property.id, brochure);
-        fileRows.push({
-          property_id: property.id,
-          file_url: brochureUrl,
-          file_type: "brochure",
-        });
-      }
-
-      if (images.length > 0) {
-        const imageUrls = await uploadPropertyImages(property.id, images);
-        for (const file_url of imageUrls) {
-          fileRows.push({
+        const { error: brochureError } = await supabase
+          .from("property_files")
+          .insert({
             property_id: property.id,
-            file_url,
-            file_type: "image",
+            file_url: brochureUrl,
+            file_type: "brochure",
           });
+
+        if (brochureError) {
+          throw new Error(
+            `Property saved, but brochure upload failed: ${brochureError.message}`,
+          );
         }
       }
 
-      if (fileRows.length > 0) {
-        const { error: filesError } = await supabase
-          .from("property_files")
-          .insert(fileRows);
+      // Upload each selected image individually and create one property_files row each
+      for (const [index, imageFile] of images.entries()) {
+        if (!imageFile.type.startsWith("image/")) {
+          throw new Error(`“${imageFile.name}” is not an image file.`);
+        }
 
-        if (filesError) {
+        const imageUrl = await uploadPropertyImage(
+          property.id,
+          imageFile,
+          index,
+        );
+        const { error: imageError } = await supabase
+          .from("property_files")
+          .insert({
+            property_id: property.id,
+            file_url: imageUrl,
+            file_type: "image",
+          });
+
+        if (imageError) {
           throw new Error(
-            `Property saved, but file records failed: ${filesError.message}`,
+            `Property saved, but image “${imageFile.name}” failed: ${imageError.message}`,
           );
         }
       }
@@ -717,19 +722,51 @@ export default function AddPropertyModal({
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   {isEditing ? "Add images" : "Images"}
                 </span>
+                <span className="mb-2 block text-xs text-zinc-500">
+                  You can select multiple images at once (JPEG, PNG, WebP, or GIF).
+                  Each image is uploaded separately and shown in the gallery.
+                </span>
                 <input
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  name="images"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/*"
                   multiple
-                  onChange={(e) =>
-                    setImages(Array.from(e.target.files ?? []))
-                  }
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files ?? []);
+                    setImages(selected);
+                    // Allow selecting the same files again later
+                    e.target.value = "";
+                  }}
                   className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
                 />
                 {images.length > 0 ? (
-                  <p className="mt-1 text-xs text-zinc-500">
-                    {images.length} new image{images.length === 1 ? "" : "s"} selected
-                  </p>
+                  <ul className="mt-3 space-y-2">
+                    <li className="text-xs text-zinc-500">
+                      {images.length} image{images.length === 1 ? "" : "s"} selected
+                    </li>
+                    {images.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      >
+                        <span className="truncate text-sm text-zinc-800">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImages((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                          className="rounded-md px-2 py-0.5 text-sm text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </label>
             </div>

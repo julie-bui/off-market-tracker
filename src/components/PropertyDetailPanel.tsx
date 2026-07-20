@@ -118,7 +118,7 @@ function PropertyDetailContent({
         supabase.from("properties").select("*").eq("id", propertyId).single(),
         supabase
           .from("property_files")
-          .select("*")
+          .select("id, property_id, file_url, file_type, created_at")
           .eq("property_id", propertyId)
           .order("created_at", { ascending: true }),
       ]);
@@ -131,6 +131,14 @@ function PropertyDetailContent({
         setError(
           propertyResult.error?.message ?? "Could not load this property.",
         );
+        setLoading(false);
+        return;
+      }
+
+      if (filesResult.error) {
+        setProperty(propertyResult.data as Property);
+        setFiles([]);
+        setError(`Could not load property files: ${filesResult.error.message}`);
         setLoading(false);
         return;
       }
@@ -299,24 +307,31 @@ function PropertyDetailContent({
               {images.length === 0 ? (
                 <p className="mt-2 text-sm text-zinc-500">No images attached.</p>
               ) : (
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {images.map((image) => (
-                    <button
-                      key={image.id}
-                      type="button"
-                      onClick={() => setLightboxUrl(image.file_url)}
-                      className="aspect-square overflow-hidden rounded-md border border-zinc-200 bg-zinc-100"
-                      aria-label="Open image"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={image.file_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {images.map((image) => (
+                      <button
+                        key={image.id}
+                        type="button"
+                        onClick={() => setLightboxUrl(image.file_url)}
+                        className="aspect-square overflow-hidden rounded-md border border-zinc-200 bg-zinc-100"
+                        aria-label="Open image"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={image.file_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                  {images.length > 1 ? (
+                    <p className="mt-2 text-xs text-zinc-500">
+                      {images.length} images
+                    </p>
+                  ) : null}
+                </>
               )}
             </section>
 

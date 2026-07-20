@@ -64,6 +64,20 @@ export async function uploadBrochure(
   return uploadPublicFile(STORAGE_BUCKETS.brochures, path, file);
 }
 
+/** Upload a single image to the `images` bucket and return its public URL. */
+export async function uploadPropertyImage(
+  propertyId: string,
+  file: File,
+  index = 0,
+): Promise<string> {
+  const path = `${propertyId}/image-${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
+  return uploadPublicFile(STORAGE_BUCKETS.images, path, file);
+}
+
+/**
+ * Upload each image individually to the `images` bucket.
+ * Returns one public URL per file, in the same order.
+ */
 export async function uploadPropertyImages(
   propertyId: string,
   files: File[],
@@ -71,8 +85,7 @@ export async function uploadPropertyImages(
   const urls: string[] = [];
 
   for (const [index, file] of files.entries()) {
-    const path = `${propertyId}/image-${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
-    const url = await uploadPublicFile(STORAGE_BUCKETS.images, path, file);
+    const url = await uploadPropertyImage(propertyId, file, index);
     urls.push(url);
   }
 

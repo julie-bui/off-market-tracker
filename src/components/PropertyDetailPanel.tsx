@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
@@ -84,6 +90,143 @@ function DetailRow({
     <div className="grid grid-cols-[7.5rem_1fr] gap-3 border-b border-zinc-100 py-2.5 text-sm last:border-b-0">
       <dt className="text-zinc-500">{label}</dt>
       <dd className="whitespace-pre-wrap break-words text-zinc-900">{value}</dd>
+    </div>
+  );
+}
+
+type ImageCarouselProps = {
+  images: PropertyFile[];
+  onOpen: (url: string) => void;
+};
+
+function ImageCarousel({ images, onOpen }: ImageCarouselProps) {
+  const [index, setIndex] = useState(0);
+  const dragStartX = useRef<number | null>(null);
+  const dragDeltaX = useRef(0);
+  const didSwipe = useRef(false);
+
+  if (images.length === 0) {
+    return (
+      <div className="flex aspect-[4/3] items-center justify-center rounded-md border border-dashed border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
+        No images attached
+      </div>
+    );
+  }
+
+  const safeIndex = Math.min(index, images.length - 1);
+  const current = images[safeIndex];
+
+  function goTo(next: number) {
+    const count = images.length;
+    setIndex(((next % count) + count) % count);
+  }
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    dragStartX.current = event.clientX;
+    dragDeltaX.current = 0;
+    didSwipe.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragStartX.current == null) return;
+    dragDeltaX.current = event.clientX - dragStartX.current;
+  }
+
+  function onPointerUp(event: ReactPointerEvent<HTMLDivElement>) {
+    if (dragStartX.current == null) return;
+
+    const delta = dragDeltaX.current;
+    dragStartX.current = null;
+    dragDeltaX.current = 0;
+
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {
+      // ignore if capture already released
+    }
+
+    if (Math.abs(delta) < 40) return;
+    didSwipe.current = true;
+    if (delta < 0) goTo(safeIndex + 1);
+    else goTo(safeIndex - 1);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div
+        className="relative aspect-[4/3] touch-pan-y overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 select-none"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            if (didSwipe.current) {
+              didSwipe.current = false;
+              return;
+            }
+            onOpen(current.file_url);
+          }}
+          className="absolute inset-0"
+          aria-label="Open image"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={current.file_url}
+            alt=""
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        </button>
+
+        {images.length > 1 ? (
+          <>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                goTo(safeIndex - 1);
+              }}
+              className="absolute top-1/2 left-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
+              aria-label="Previous image"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                goTo(safeIndex + 1);
+              }}
+              className="absolute top-1/2 right-2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-lg leading-none text-white hover:bg-black/70"
+              aria-label="Next image"
+            >
+              ›
+            </button>
+          </>
+        ) : null}
+      </div>
+
+      {images.length > 1 ? (
+        <div className="flex items-center justify-center gap-1.5">
+          {images.map((image, i) => (
+            <button
+              key={image.id}
+              type="button"
+              onClick={() => setIndex(i)}
+              className={[
+                "h-2 w-2 rounded-full transition-colors",
+                i === safeIndex ? "bg-zinc-800" : "bg-zinc-300 hover:bg-zinc-400",
+              ].join(" ")}
+              aria-label={`Go to image ${i + 1}`}
+              aria-current={i === safeIndex}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -231,6 +374,33 @@ function PropertyDetailContent({
 
         {property ? (
           <>
+            <section className="mb-5">
+              <ImageCarousel images={images} onOpen={setLightboxUrl} />
+            </section>
+
+            <section className="mb-5">
+              <h3 className="text-sm font-semibold text-zinc-900">Brochures</h3>
+              {brochures.length === 0 ? (
+                <p className="mt-2 text-sm text-zinc-500">No brochures attached.</p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-2">
+                  {brochures.map((brochure, index) => (
+                    <a
+                      key={brochure.id}
+                      href={brochure.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900 hover:border-zinc-300 hover:bg-zinc-100"
+                    >
+                      {brochures.length === 1
+                        ? "View Brochure"
+                        : `View Brochure ${index + 1}`}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </section>
+
             <dl>
               <DetailRow label="Address" value={property.address} />
               <DetailRow label="Postcode" value={property.postcode ?? "—"} />
@@ -289,69 +459,6 @@ function PropertyDetailContent({
                 value={formatDateTime(property.last_updated_at)}
               />
             </dl>
-
-            <section className="mt-5">
-              <h3 className="text-sm font-semibold text-zinc-900">Images</h3>
-              {images.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-500">No images attached.</p>
-              ) : (
-                <>
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {images.map((image) => (
-                      <button
-                        key={image.id}
-                        type="button"
-                        onClick={() => setLightboxUrl(image.file_url)}
-                        className="aspect-square overflow-hidden rounded-md border border-zinc-200 bg-zinc-100"
-                        aria-label="Open image"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={image.file_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                    ))}
-                  </div>
-                  {images.length > 1 ? (
-                    <p className="mt-2 text-xs text-zinc-500">
-                      {images.length} images
-                    </p>
-                  ) : null}
-                </>
-              )}
-            </section>
-
-            <section className="mt-5">
-              <h3 className="text-sm font-semibold text-zinc-900">Brochures</h3>
-              {brochures.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-500">No brochures attached.</p>
-              ) : (
-                <>
-                  <ul className="mt-2 space-y-2">
-                    {brochures.map((brochure, index) => (
-                      <li key={brochure.id}>
-                        <a
-                          href={brochure.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-medium text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700"
-                        >
-                          View / download brochure
-                          {brochures.length > 1 ? ` ${index + 1}` : ""}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                  {brochures.length > 1 ? (
-                    <p className="mt-2 text-xs text-zinc-500">
-                      {brochures.length} brochures
-                    </p>
-                  ) : null}
-                </>
-              )}
-            </section>
           </>
         ) : null}
       </div>

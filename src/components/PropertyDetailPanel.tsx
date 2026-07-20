@@ -79,6 +79,10 @@ function formatSpecs(specs: Property["specs"] | unknown): string {
   return String(specs);
 }
 
+function streetViewUrl(latitude: number, longitude: number): string {
+  return `https://www.google.com/maps/@${latitude},${longitude},3a,75y,90t/data=!3m6!1e1`;
+}
+
 function DetailRow({
   label,
   value,
@@ -377,6 +381,19 @@ function PropertyDetailContent({
             <section className="mb-5">
               <ImageCarousel images={images} onOpen={setLightboxUrl} />
             </section>
+
+            {property.latitude != null && property.longitude != null ? (
+              <section className="mb-5">
+                <a
+                  href={streetViewUrl(property.latitude, property.longitude)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900 hover:border-zinc-300 hover:bg-zinc-100"
+                >
+                  View on Street View
+                </a>
+              </section>
+            ) : null}
 
             <section className="mb-5">
               <h3 className="text-sm font-semibold text-zinc-900">Brochures</h3>

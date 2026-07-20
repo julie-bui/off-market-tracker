@@ -10,15 +10,24 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { supabase } from "@/lib/supabase";
+import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
 const DEFAULT_ZOOM = 11;
+
+const STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
+  available: "#16a34a", // green
+  under_offer: "#d97706", // amber
+  let: "#6b7280", // gray
+  withdrawn: "#6b7280", // gray
+};
 
 export type PropertyMarkerData = {
   id: string;
   address: string;
   latitude: number;
   longitude: number;
+  status?: PropertyStatus | null;
 };
 
 export type PropertyMapHandle = {
@@ -37,6 +46,7 @@ type PropertyMarkerRow = {
   address: string;
   latitude: number | null;
   longitude: number | null;
+  status: PropertyStatus | null;
 };
 
 /** Transit / transport layers should stay visible even if they look POI-like. */
@@ -97,6 +107,26 @@ function hidePoiLayers(map: maplibregl.Map) {
   }
 }
 
+function pinColorForStatus(status?: PropertyStatus | null): string {
+  if (!status) return STATUS_PIN_COLORS.available;
+  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.available;
+}
+
+/** Teardrop pin SVG — tip is at the bottom center of the viewBox. */
+function createPinSvg(fill: string): string {
+  return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 40" width="28" height="40" aria-hidden="true" focusable="false">
+      <path
+        d="M14 0C6.268 0 0 6.268 0 14c0 9.625 12.042 24.292 12.554 24.906a1.87 1.87 0 0 0 2.892 0C16.958 38.292 28 23.625 28 14 28 6.268 21.732 0 14 0z"
+        fill="${fill}"
+        stroke="#ffffff"
+        stroke-width="1.75"
+      />
+      <circle cx="14" cy="14" r="5" fill="#ffffff" fill-opacity="0.9" />
+    </svg>
+  `.trim();
+}
+
 function createMarkerElement(
   property: PropertyMarkerData,
   onSelect: (propertyId: string) => void,
@@ -106,6 +136,8 @@ function createMarkerElement(
   el.className = "property-map-marker";
   el.title = property.address;
   el.setAttribute("aria-label", `View ${property.address}`);
+  el.dataset.status = property.status ?? "available";
+  el.innerHTML = createPinSvg(pinColorForStatus(property.status));
   el.addEventListener("click", (event) => {
     event.stopPropagation();
     onSelect(property.id);
@@ -223,7 +255,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
         void (async () => {
           const { data, error } = await supabase
             .from("properties")
-            .select("id, address, latitude, longitude");
+            .select("id, address, latitude, longitude, status");
 
           if (signal.cancelled) return;
 
@@ -245,6 +277,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
                 address: property.address,
                 latitude: property.latitude,
                 longitude: property.longitude,
+                status: property.status,
               },
               selectProperty,
             );

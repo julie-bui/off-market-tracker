@@ -23,17 +23,27 @@ body {
 }
 
 .property-map-marker {
+  display: block;
   width: 28px;
-  height: 28px;
-  border: 2px solid #ffffff;
-  border-radius: 9999px;
-  background: #18181b;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
+  height: 40px;
   padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  line-height: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+}
+
+.property-map-marker svg {
+  display: block;
+  width: 28px;
+  height: 40px;
+  pointer-events: none;
 }
 
 .property-map-marker:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
+  border-radius: 4px;
 }

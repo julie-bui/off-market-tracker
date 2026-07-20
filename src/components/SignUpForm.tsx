@@ -4,13 +4,14 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { supabase } from "@/lib/supabase";
+import { signUpWithInvite } from "@/lib/auth/actions";
 
 export default function SignUpForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -30,29 +31,34 @@ export default function SignUpForm() {
       return;
     }
 
+    if (!inviteCode.trim()) {
+      setError("Invite code is required.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const result = await signUpWithInvite({
         email: email.trim(),
         password,
+        inviteCode,
       });
 
-      if (signUpError) {
-        setError(signUpError.message || "Could not create your account.");
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
-      // If email confirmation is disabled, a session is returned immediately.
-      if (data.session) {
-        router.replace("/");
-        router.refresh();
+      if (result.needsEmailConfirmation) {
+        setInfo(
+          "Account created. Check your email to confirm your address, then log in.",
+        );
         return;
       }
 
-      setInfo(
-        "Account created. Check your email to confirm your address, then log in.",
-      );
+      router.replace("/");
+      router.refresh();
     } catch {
       setError("Something went wrong while signing up. Please try again.");
     } finally {
@@ -125,6 +131,22 @@ export default function SignUpForm() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-1 block text-sm font-medium text-zinc-700">
+          Invite code
+        </span>
+        <input
+          type="text"
+          name="inviteCode"
+          autoComplete="off"
+          required
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value)}
+          className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+          placeholder="Enter your invite code"
         />
       </label>
 

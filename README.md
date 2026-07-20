@@ -23,7 +23,7 @@ cp .env.local.example .env.local
 ```
 
 Fill in your Supabase project URL and anon key from **Project Settings → API**,
-plus a MapTiler key for the map.
+a server-only `INVITE_CODE` for sign-up, plus a MapTiler key for the map.
 
 ### 3. Apply the database schema
 
@@ -53,7 +53,8 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). Unauthenticated visitors
-are redirected to `/login`. New accounts can be created at `/signup`.
+are redirected to `/login`. New accounts can be created at `/signup` with the
+shared `INVITE_CODE` (validated server-side before Supabase Auth sign-up).
 
 ## Project structure
 

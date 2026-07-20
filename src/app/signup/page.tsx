@@ -10,7 +10,7 @@ export default function SignUpPage() {
           </p>
           <h1 className="mt-1 text-xl font-semibold text-zinc-900">Sign up</h1>
           <p className="mt-2 text-sm text-zinc-500">
-            Create an email and password account to start tracking properties.
+            Create an account with your email, password, and invite code.
           </p>
         </div>
 

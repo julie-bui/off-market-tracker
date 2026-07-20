@@ -91,14 +91,32 @@ const INITIAL_FORM: FormState = {
   notes: "",
 };
 
-function specsToText(specs: Property["specs"]): string {
+function specsToText(specs: Property["specs"] | unknown): string {
   if (specs == null) return "";
-  if (typeof specs === "string") return specs;
+
   if (typeof specs === "object" && !Array.isArray(specs)) {
-    if (typeof specs.text === "string") return specs.text;
-    if (Object.keys(specs).length === 0) return "";
-    return JSON.stringify(specs, null, 2);
+    const record = specs as Record<string, unknown>;
+    if (typeof record.text === "string") return specsToText(record.text);
+    if (Object.keys(record).length === 0) return "";
+    return "";
   }
+
+  if (typeof specs === "string") {
+    const trimmed = specs.trim();
+    if (!trimmed) return "";
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    ) {
+      try {
+        return specsToText(JSON.parse(trimmed));
+      } catch {
+        return specs;
+      }
+    }
+    return specs;
+  }
+
   return String(specs);
 }
 
@@ -248,7 +266,7 @@ export default function AddPropertyModal({
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
-        specs: form.specs.trim() ? { text: form.specs.trim() } : {},
+        specs: form.specs.trim() || null,
         notes: form.notes.trim() || null,
       };
 

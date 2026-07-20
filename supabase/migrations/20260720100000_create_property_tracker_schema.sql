@@ -46,7 +46,7 @@ create table public.properties (
   agent_name text,
   agent_phone text,
   agent_email text,
-  specs jsonb default '{}'::jsonb,
+  specs text,
   notes text,
   created_at timestamptz not null default now(),
   last_updated_at timestamptz not null default now()

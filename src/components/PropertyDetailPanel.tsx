@@ -44,16 +44,32 @@ function formatLabel(value: string | null | undefined): string {
   return value.replaceAll("_", " ");
 }
 
-function formatSpecs(specs: Property["specs"]): string {
+function formatSpecs(specs: Property["specs"] | unknown): string {
   if (specs == null) return "—";
-  if (typeof specs === "string") return specs || "—";
+
   if (typeof specs === "object" && !Array.isArray(specs)) {
-    const text = specs.text;
-    if (typeof text === "string" && text.trim()) return text;
-    const keys = Object.keys(specs);
-    if (keys.length === 0) return "—";
-    return JSON.stringify(specs, null, 2);
+    const record = specs as Record<string, unknown>;
+    if (typeof record.text === "string") return formatSpecs(record.text);
+    if (Object.keys(record).length === 0) return "—";
+    return "—";
   }
+
+  if (typeof specs === "string") {
+    const trimmed = specs.trim();
+    if (!trimmed) return "—";
+    if (
+      (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+      (trimmed.startsWith('"') && trimmed.endsWith('"'))
+    ) {
+      try {
+        return formatSpecs(JSON.parse(trimmed));
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
   return String(specs);
 }
 

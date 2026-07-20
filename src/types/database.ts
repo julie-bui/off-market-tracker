@@ -42,7 +42,7 @@ export type Database = {
           agent_name: string | null;
           agent_phone: string | null;
           agent_email: string | null;
-          specs: Json | null;
+          specs: string | null;
           notes: string | null;
           created_at: string;
           last_updated_at: string;
@@ -63,7 +63,7 @@ export type Database = {
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;
-          specs?: Json | null;
+          specs?: string | null;
           notes?: string | null;
           created_at?: string;
           last_updated_at?: string;
@@ -84,7 +84,7 @@ export type Database = {
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;
-          specs?: Json | null;
+          specs?: string | null;
           notes?: string | null;
           created_at?: string;
           last_updated_at?: string;

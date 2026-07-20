@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
-const DEFAULT_ZOOM = 15;
+const DEFAULT_ZOOM = 13;
 
 const STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
   available: "#16a34a", // green

@@ -79,19 +79,17 @@ function formatSpecs(specs: Property["specs"] | unknown): string {
   return String(specs);
 }
 
+/** Official Google Maps URLs API Street View link (map_action=pano only). */
 function streetViewUrl(latitude: number, longitude: number): string {
-  // Google Maps URLs API: viewpoint is latitude,longitude (not lng,lat).
   const lat = Number(latitude);
   const lng = Number(longitude);
   return `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
 }
 
 function openStreetView(latitude: number, longitude: number) {
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  const url = streetViewUrl(lat, lng);
-  // Log the exact URL right before opening so we can verify coords + format.
-  console.log("[Street View] opening", { latitude: lat, longitude: lng, url });
+  const url = streetViewUrl(latitude, longitude);
+  // Single final URL for verification in DevTools.
+  console.log(url);
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
@@ -407,15 +405,18 @@ function PropertyDetailContent({
 
             {property.latitude != null && property.longitude != null ? (
               <section className="mb-5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    openStreetView(property.latitude!, property.longitude!)
-                  }
+                <a
+                  href={streetViewUrl(property.latitude, property.longitude)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    openStreetView(property.latitude!, property.longitude!);
+                  }}
                   className="inline-flex w-full items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-900 hover:border-zinc-300 hover:bg-zinc-100"
                 >
                   View on Street View
-                </button>
+                </a>
               </section>
             ) : null}
 

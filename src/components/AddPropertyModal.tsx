@@ -912,7 +912,9 @@ export default function AddPropertyModal({
                   accept="application/pdf,.pdf"
                   multiple
                   onChange={(e) => {
-                    setBrochures(Array.from(e.target.files ?? []));
+                    const selected = Array.from(e.target.files ?? []);
+                    if (selected.length === 0) return;
+                    setBrochures((current) => [...current, ...selected]);
                     setUploadRetry(null);
                     e.target.value = "";
                   }}
@@ -960,11 +962,14 @@ export default function AddPropertyModal({
                 </span>
                 <input
                   type="file"
+                  id="property-images-input"
                   name="images"
                   accept="image/jpeg,image/png,image/webp,image/gif,image/*"
-                  multiple
+                  multiple={true}
                   onChange={(e) => {
-                    setImages(Array.from(e.target.files ?? []));
+                    const selected = Array.from(e.target.files ?? []);
+                    if (selected.length === 0) return;
+                    setImages((current) => [...current, ...selected]);
                     setUploadRetry(null);
                     e.target.value = "";
                   }}

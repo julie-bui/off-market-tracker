@@ -90,7 +90,7 @@ export default function MapPageClient() {
 
   return (
     <>
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 p-4 sm:p-6">
         <div className="pointer-events-auto flex flex-col items-start gap-3">
           <div className="rounded-md bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
             <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
@@ -110,11 +110,16 @@ export default function MapPageClient() {
           </button>
         </div>
 
+        {/*
+          Position with absolute right/top — not flex + margin.
+          justify-between + mr-* looked like a no-op next to MapLibre's
+          fixed top-right NavigationControl.
+        */}
         <button
           type="button"
           onClick={() => void handleLogout()}
           disabled={loggingOut}
-          className="pointer-events-auto mr-[100px] rounded-md bg-white/90 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-60"
+          className="pointer-events-auto absolute top-4 right-[100px] z-10 rounded-md bg-white/90 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-60 sm:top-6"
         >
           {loggingOut ? "Logging out…" : "Log out"}
         </button>

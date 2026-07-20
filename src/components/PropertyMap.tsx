@@ -241,7 +241,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
 
       map.addControl(
         new maplibregl.NavigationControl({ showCompass: true }),
-        "top-right",
+        "bottom-right",
       );
 
       map.on("click", () => {

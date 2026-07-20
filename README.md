@@ -1,11 +1,12 @@
 # Off-Market Tracker
 
-Next.js property tracker backed by Supabase. Open access — no authentication.
+Next.js property tracker backed by Supabase Auth, Postgres, and Storage.
 
 ## Stack
 
 - **Next.js** (App Router) + **TypeScript** + **Tailwind CSS**
-- **Supabase** (Postgres + Storage)
+- **Supabase** (Auth + Postgres + Storage)
+- **MapLibre** + **MapTiler** basemap
 
 ## Setup
 
@@ -21,7 +22,8 @@ npm install
 cp .env.local.example .env.local
 ```
 
-Fill in your Supabase project URL and anon key from **Project Settings → API**.
+Fill in your Supabase project URL and anon key from **Project Settings → API**,
+plus a MapTiler key for the map.
 
 ### 3. Apply the database schema
 
@@ -33,34 +35,35 @@ npx supabase link --project-ref <your-project-ref>
 npx supabase db push
 ```
 
-Or paste `supabase/migrations/20260720100000_create_property_tracker_schema.sql` into the Supabase SQL Editor and run it.
+This creates the `properties` / `property_files` tables, storage buckets, and
+RLS policies that require an **authenticated** user (`auth.uid() is not null`).
 
-This creates:
+### 4. Enable email/password auth
 
-| Table / resource | Purpose |
-| --- | --- |
-| `properties` | Core property records (`total_price` = `size_sqft * cost_per_sqft`) |
-| `property_files` | Brochure / image file references (`file_type`: `brochure` \| `image`) |
-| Storage bucket `brochures` | Public PDF uploads (max 50 MB) |
-| Storage bucket `images` | Public image uploads (max 10 MB) |
+In the Supabase dashboard:
 
-Row Level Security is enabled with **open policies** for `anon` and `authenticated` (select/insert/update/delete). No login required.
+1. **Authentication → Providers → Email** — enable Email provider.
+2. Optionally disable **Confirm email** if you want sign-up to log users in
+   immediately (otherwise they must confirm via email first).
 
-### 4. Run the app
+### 5. Run the app
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). Unauthenticated visitors
+are redirected to `/login`. New accounts can be created at `/signup`.
 
 ## Project structure
 
 ```
 src/
-  app/                  # Next.js App Router
-  lib/supabase/         # Browser + server clients, storage bucket IDs
-  types/database.ts     # Typed Database schema for Supabase clients
+  app/                  # App Router (/, /login, /signup)
+  components/           # Map, forms, detail panel, auth forms
+  lib/supabase/         # Browser + server clients, middleware helper
+  middleware.ts         # Session refresh + auth redirects
+  types/database.ts     # Typed Database schema
 supabase/
   migrations/           # SQL schema, RLS, and storage buckets
 ```
@@ -70,3 +73,5 @@ supabase/
 **`properties`** — address, postcode, lat/lng, size & pricing, availability, status (`available` / `under_offer` / `let` / `withdrawn`), agent contacts, specs (plain text), notes, timestamps.
 
 **`property_files`** — `property_id` FK, `file_url`, `file_type` (`brochure` / `image`).
+
+**RLS** — select/insert/update/delete on tables and `images` / `brochures` storage objects require `authenticated` with `auth.uid() is not null`.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import AddPropertyModal, {
   type CreatedPropertyMarker,
@@ -9,9 +10,11 @@ import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import PropertyMap, {
   type PropertyMapHandle,
 } from "@/components/PropertyMap";
+import { supabase } from "@/lib/supabase";
 import type { Property, PropertyFile } from "@/types/database";
 
 export default function MapPageClient() {
+  const router = useRouter();
   const mapRef = useRef<PropertyMapHandle>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalKey, setModalKey] = useState(0);
@@ -21,6 +24,7 @@ export default function MapPageClient() {
     null,
   );
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const openCreateModal = useCallback(() => {
     setPropertyToEdit(null);
@@ -73,9 +77,20 @@ export default function MapPageClient() {
     setSelectedPropertyId(propertyId);
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    setLoggingOut(true);
+    try {
+      await supabase.auth.signOut();
+      router.replace("/login");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [router]);
+
   return (
     <>
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start gap-4 p-4 sm:p-6">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 p-4 sm:p-6">
         <div className="pointer-events-auto flex flex-col items-start gap-3">
           <div className="rounded-md bg-white/90 px-4 py-3 shadow-sm backdrop-blur">
             <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
@@ -94,6 +109,15 @@ export default function MapPageClient() {
             Add Property
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          disabled={loggingOut}
+          className="pointer-events-auto rounded-md bg-white/90 px-3 py-2 text-sm font-medium text-zinc-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-60"
+        >
+          {loggingOut ? "Logging out…" : "Log out"}
+        </button>
       </header>
 
       <div className="absolute inset-0">

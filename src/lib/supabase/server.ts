@@ -21,7 +21,7 @@ export async function createClient() {
             );
           } catch {
             // Called from a Server Component — safe to ignore when middleware
-            // refreshes sessions. Not required for open-access (no auth) usage.
+            // refreshes user sessions.
           }
         },
       },

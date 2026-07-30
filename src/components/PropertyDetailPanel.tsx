@@ -398,12 +398,12 @@ function PropertyDetailContent({
                 value={propertyStatusLabel(property.status)}
               />
               <DetailRow
-                label="Availability"
+                label="Availability date"
                 value={property.availability_period ?? "—"}
               />
               <DetailRow label="Building size" value={property.building ?? "—"} />
               <DetailRow
-                label="Available floor(s)"
+                label="No. available floor(s)"
                 value={property.available_floors ?? "—"}
               />
               <DetailRow
@@ -414,7 +414,7 @@ function PropertyDetailContent({
                     : "—"
                 }
               />
-              <DetailRow label="Floor" value={property.floor ?? "—"} />
+              <DetailRow label="Floor/demise" value={property.floor ?? "—"} />
               <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
               <DetailRow label="Agent Company" value={property.company ?? "—"} />
               <DetailRow

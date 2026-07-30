@@ -21,7 +21,26 @@ export const PROPERTY_STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
   undergoing_refurbishment: "#7c3aed", // violet
 };
 
-export function propertyStatusLabel(status: PropertyStatus | null | undefined): string {
+/** Map legacy DB statuses (pre-migration) onto the current options. */
+const LEGACY_STATUS_MAP: Record<string, PropertyStatus> = {
+  available: "coming_available_soon",
+  under_offer: "under_construction",
+  let: "spacepoint_client",
+  withdrawn: "undergoing_refurbishment",
+};
+
+export function normalizePropertyStatus(
+  status: string | null | undefined,
+): PropertyStatus {
+  if (!status) return "coming_available_soon";
+  if ((PROPERTY_STATUSES as string[]).includes(status)) {
+    return status as PropertyStatus;
+  }
+  return LEGACY_STATUS_MAP[status] ?? "coming_available_soon";
+}
+
+export function propertyStatusLabel(status: string | null | undefined): string {
   if (!status) return "—";
-  return PROPERTY_STATUS_LABELS[status] ?? status.replaceAll("_", " ");
+  const normalized = normalizePropertyStatus(status);
+  return PROPERTY_STATUS_LABELS[normalized];
 }

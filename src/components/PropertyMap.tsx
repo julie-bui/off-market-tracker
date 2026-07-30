@@ -12,6 +12,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { supabase } from "@/lib/supabase";
 import {
   PROPERTY_STATUS_PIN_COLORS,
+  normalizePropertyStatus,
 } from "@/lib/property-status";
 import { purgeExpiredProperties } from "@/lib/purge-expired-properties";
 import type { PropertyStatus } from "@/types/database";
@@ -107,8 +108,7 @@ function hidePoiLayers(map: maplibregl.Map) {
 }
 
 function pinColorForStatus(status?: PropertyStatus | null): string {
-  if (!status) return STATUS_PIN_COLORS.coming_available_soon;
-  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.coming_available_soon;
+  return STATUS_PIN_COLORS[normalizePropertyStatus(status)];
 }
 
 /** Teardrop pin SVG — tip is at the bottom center of the viewBox. */
@@ -135,7 +135,7 @@ function createMarkerElement(
   el.className = "property-map-marker";
   el.title = property.address;
   el.setAttribute("aria-label", `View ${property.address}`);
-  el.dataset.status = property.status ?? "coming_available_soon";
+  el.dataset.status = normalizePropertyStatus(property.status);
   el.innerHTML = createPinSvg(pinColorForStatus(property.status));
   el.addEventListener("click", (event) => {
     event.stopPropagation();

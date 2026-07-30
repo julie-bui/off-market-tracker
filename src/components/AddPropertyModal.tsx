@@ -16,6 +16,7 @@ import {
 import {
   PROPERTY_STATUSES,
   propertyStatusLabel,
+  normalizePropertyStatus,
 } from "@/lib/property-status";
 import { supabase } from "@/lib/supabase";
 import {
@@ -104,7 +105,7 @@ function propertyToFormState(property: Property): FormState {
     postcode: property.postcode ?? "",
     size_sqft: property.size_sqft != null ? String(property.size_sqft) : "",
     availability_period: property.availability_period ?? "",
-    status: property.status,
+    status: normalizePropertyStatus(property.status),
     company: property.company ?? "",
     building: property.building ?? "",
     available_floors: property.available_floors ?? "",
@@ -832,7 +833,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Availability
+                  Availability date
                 </span>
                 <input
                   value={form.availability_period}
@@ -857,7 +858,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Available floor(s)
+                  No. available floor(s)
                 </span>
                 <input
                   value={form.available_floors}
@@ -885,7 +886,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Floor
+                  Floor/demise
                 </span>
                 <input
                   value={form.floor}

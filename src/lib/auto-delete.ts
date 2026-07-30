@@ -1,12 +1,23 @@
 /** Fixed retention period for property auto-delete. */
 export const AUTO_DELETE_DEFAULT_MONTHS = 3;
 
-/** Add calendar months to a date (local time), preserving clock time. */
-export function addMonths(date: Date, months: number): Date {
+/** Add calendar months in UTC, preserving the UTC clock time. */
+export function addMonthsUtc(date: Date, months: number): Date {
+  const result = new Date(date.getTime());
+  const day = result.getUTCDate();
+  result.setUTCMonth(result.getUTCMonth() + months);
+  // Clamp when the target month has fewer days (e.g. Jan 31 → Feb).
+  if (result.getUTCDate() < day) {
+    result.setUTCDate(0);
+  }
+  return result;
+}
+
+/** Add calendar months in local time, preserving local clock time. */
+export function addMonthsLocal(date: Date, months: number): Date {
   const result = new Date(date.getTime());
   const day = result.getDate();
   result.setMonth(result.getMonth() + months);
-  // Clamp when the target month has fewer days (e.g. Jan 31 → Feb).
   if (result.getDate() < day) {
     result.setDate(0);
   }
@@ -38,19 +49,20 @@ function parseLocalTimeParts(timeInput: string): {
 
 /**
  * Auto-delete date is always now + 3 months.
- * Optional time sets the clock on that day; blank keeps the current clock time.
+ * Blank time → same UTC clock as "now" (+3 months), so it matches Created time of day.
+ * Set time → that local time of day on the local calendar day of now+3 months.
  */
 export function resolveAutoDeleteAt(
   timeInput: string = "",
   from: Date = new Date(),
 ): string {
-  const base = addMonths(from, AUTO_DELETE_DEFAULT_MONTHS);
   const trimmed = timeInput.trim();
 
   if (!trimmed) {
-    return base.toISOString();
+    return addMonthsUtc(from, AUTO_DELETE_DEFAULT_MONTHS).toISOString();
   }
 
+  const base = addMonthsLocal(from, AUTO_DELETE_DEFAULT_MONTHS);
   const { hour, minute } = parseLocalTimeParts(trimmed);
   const withTime = new Date(
     base.getFullYear(),
@@ -81,7 +93,7 @@ export function toTimeInputValue(
 
 /** Local calendar date label for the fixed 3-month auto-delete day. */
 export function formatAutoDeleteDateLabel(from: Date = new Date()): string {
-  const date = addMonths(from, AUTO_DELETE_DEFAULT_MONTHS);
+  const date = addMonthsLocal(from, AUTO_DELETE_DEFAULT_MONTHS);
   return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
     month: "short",

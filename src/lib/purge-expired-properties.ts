@@ -12,6 +12,7 @@ export async function purgeExpiredProperties(): Promise<string[]> {
   const { data, error } = await supabase
     .from("properties")
     .select("id")
+    .not("auto_delete_at", "is", null)
     .lte("auto_delete_at", nowIso);
 
   if (error) {

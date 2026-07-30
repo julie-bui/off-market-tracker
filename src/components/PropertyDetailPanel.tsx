@@ -445,7 +445,11 @@ function PropertyDetailContent({
               <DetailRow label="Notes" value={property.notes ?? "—"} />
               <DetailRow
                 label="Auto-delete"
-                value={formatDateTime(property.auto_delete_at)}
+                value={
+                  property.auto_delete_at
+                    ? formatDateTime(property.auto_delete_at)
+                    : "Keep forever"
+                }
               />
               <DetailRow
                 label="Created"

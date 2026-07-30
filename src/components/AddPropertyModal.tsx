@@ -5,8 +5,10 @@ import { createPortal } from "react-dom";
 
 import { geocodeAddress } from "@/lib/geocode";
 import {
+  defaultAutoDeleteDateInput,
   defaultAutoDeleteHint,
   resolveAutoDeleteAt,
+  toDateInputValue,
   toTimeInputValue,
 } from "@/lib/auto-delete";
 import {
@@ -69,6 +71,8 @@ type FormState = {
   agent_phone: string;
   agent_email: string;
   notes: string;
+  auto_delete_enabled: boolean;
+  auto_delete_date: string;
   auto_delete_time: string;
 };
 
@@ -96,10 +100,20 @@ const INITIAL_FORM: FormState = {
   agent_phone: "",
   agent_email: "",
   notes: "",
+  auto_delete_enabled: true,
+  auto_delete_date: "",
   auto_delete_time: "",
 };
 
+function createInitialForm(): FormState {
+  return {
+    ...INITIAL_FORM,
+    auto_delete_date: defaultAutoDeleteDateInput(),
+  };
+}
+
 function propertyToFormState(property: Property): FormState {
+  const hasAutoDelete = property.auto_delete_at != null;
   return {
     address: property.address,
     postcode: property.postcode ?? "",
@@ -114,7 +128,13 @@ function propertyToFormState(property: Property): FormState {
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
     notes: property.notes ?? "",
-    auto_delete_time: toTimeInputValue(property.auto_delete_at),
+    auto_delete_enabled: hasAutoDelete,
+    auto_delete_date: hasAutoDelete
+      ? toDateInputValue(property.auto_delete_at)
+      : defaultAutoDeleteDateInput(),
+    auto_delete_time: hasAutoDelete
+      ? toTimeInputValue(property.auto_delete_at)
+      : "",
   };
 }
 
@@ -152,7 +172,7 @@ export default function AddPropertyModal({
   const isEditing = propertyToEdit != null;
   const titleId = useId();
   const [form, setForm] = useState<FormState>(() =>
-    propertyToEdit ? propertyToFormState(propertyToEdit) : INITIAL_FORM,
+    propertyToEdit ? propertyToFormState(propertyToEdit) : createInitialForm(),
   );
   const [brochures, setBrochures] = useState<File[]>([]);
   const [images, setImages] = useState<File[]>([]);
@@ -438,14 +458,18 @@ export default function AddPropertyModal({
         return;
       }
 
-      let autoDeleteAt: string;
+      let autoDeleteAt: string | null;
       try {
-        autoDeleteAt = resolveAutoDeleteAt(form.auto_delete_time);
+        autoDeleteAt = resolveAutoDeleteAt({
+          enabled: form.auto_delete_enabled,
+          dateInput: form.auto_delete_date,
+          timeInput: form.auto_delete_time,
+        });
       } catch (err) {
         setError(
           err instanceof Error
             ? err.message
-            : "Auto-delete time must be a valid time.",
+            : "Auto-delete date/time must be valid.",
         );
         return;
       }
@@ -953,22 +977,74 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block sm:col-span-2">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Auto-delete time
-                </span>
-                <span className="mb-2 block text-xs text-zinc-500">
-                  {defaultAutoDeleteHint()}
-                </span>
-                <input
-                  type="time"
-                  value={form.auto_delete_time}
-                  onChange={(e) =>
-                    updateField("auto_delete_time", e.target.value)
-                  }
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:max-w-xs"
-                />
-              </label>
+              <div className="sm:col-span-2 space-y-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-3">
+                <div className="flex items-start gap-3">
+                  <input
+                    id="auto-delete-enabled"
+                    type="checkbox"
+                    checked={form.auto_delete_enabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setForm((current) => ({
+                        ...current,
+                        auto_delete_enabled: enabled,
+                        auto_delete_date:
+                          enabled && !current.auto_delete_date
+                            ? defaultAutoDeleteDateInput()
+                            : current.auto_delete_date,
+                      }));
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-500"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <label
+                      htmlFor="auto-delete-enabled"
+                      className="block text-sm font-medium text-zinc-700"
+                    >
+                      Auto-delete this property
+                    </label>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {defaultAutoDeleteHint()}
+                    </p>
+                  </div>
+                </div>
+
+                {form.auto_delete_enabled ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-zinc-600">
+                        Delete date
+                      </span>
+                      <input
+                        type="date"
+                        required={form.auto_delete_enabled}
+                        value={form.auto_delete_date}
+                        onChange={(e) =>
+                          updateField("auto_delete_date", e.target.value)
+                        }
+                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-xs font-medium text-zinc-600">
+                        Delete time (optional)
+                      </span>
+                      <input
+                        type="time"
+                        value={form.auto_delete_time}
+                        onChange={(e) =>
+                          updateField("auto_delete_time", e.target.value)
+                        }
+                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-600">
+                    This property will be kept (no automatic deletion).
+                  </p>
+                )}
+              </div>
 
               {isEditing ? (
                 <div className="space-y-3 sm:col-span-2">

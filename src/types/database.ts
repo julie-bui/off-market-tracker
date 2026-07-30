@@ -37,7 +37,7 @@ export type Database = {
           agent_email: string | null;
           specs: string | null;
           notes: string | null;
-          auto_delete_at: string;
+          auto_delete_at: string | null;
           created_at: string;
           last_updated_at: string;
         };
@@ -60,7 +60,7 @@ export type Database = {
           agent_email?: string | null;
           specs?: string | null;
           notes?: string | null;
-          auto_delete_at?: string;
+          auto_delete_at?: string | null;
           created_at?: string;
           last_updated_at?: string;
         };
@@ -83,7 +83,7 @@ export type Database = {
           agent_email?: string | null;
           specs?: string | null;
           notes?: string | null;
-          auto_delete_at?: string;
+          auto_delete_at?: string | null;
           created_at?: string;
           last_updated_at?: string;
         };

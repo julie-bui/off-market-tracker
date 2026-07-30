@@ -10,6 +10,7 @@ import {
 
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
+import { propertyStatusLabel } from "@/lib/property-status";
 import { formatSpecsForDisplay } from "@/lib/specs";
 import { buildStreetViewUrl, openStreetView } from "@/lib/street-view";
 import type { Property, PropertyFile } from "@/types/database";
@@ -45,11 +46,6 @@ function formatDateTime(value: string | null | undefined): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
-}
-
-function formatLabel(value: string | null | undefined): string {
-  if (!value) return "—";
-  return value.replaceAll("_", " ");
 }
 
 function DetailRow({
@@ -407,8 +403,12 @@ function PropertyDetailContent({
               <DetailRow label="Address" value={property.address} />
               <DetailRow label="Postcode" value={property.postcode ?? "—"} />
               <DetailRow
-                label="Size (sq ft)"
-                value={formatNumber(property.size_sqft)}
+                label="Approx Floor Size"
+                value={
+                  property.size_sqft != null
+                    ? `${formatNumber(property.size_sqft)} sq ft`
+                    : "—"
+                }
               />
               <DetailRow
                 label="Cost / sq ft"
@@ -418,8 +418,14 @@ function PropertyDetailContent({
                 label="Availability"
                 value={property.availability_period ?? "—"}
               />
-              <DetailRow label="Status" value={formatLabel(property.status)} />
+              <DetailRow
+                label="Status"
+                value={propertyStatusLabel(property.status)}
+              />
+              <DetailRow label="Company" value={property.company ?? "—"} />
               <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
+              <DetailRow label="Floor" value={property.floor ?? "—"} />
+              <DetailRow label="Building" value={property.building ?? "—"} />
               <DetailRow
                 label="Agent phone"
                 value={

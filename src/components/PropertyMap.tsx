@@ -10,17 +10,15 @@ import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { supabase } from "@/lib/supabase";
+import {
+  PROPERTY_STATUS_PIN_COLORS,
+} from "@/lib/property-status";
 import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
 const DEFAULT_ZOOM = 13;
 
-const STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
-  available: "#16a34a", // green
-  under_offer: "#d97706", // amber
-  let: "#6b7280", // gray
-  withdrawn: "#6b7280", // gray
-};
+const STATUS_PIN_COLORS = PROPERTY_STATUS_PIN_COLORS;
 
 export type PropertyMarkerData = {
   id: string;
@@ -108,8 +106,8 @@ function hidePoiLayers(map: maplibregl.Map) {
 }
 
 function pinColorForStatus(status?: PropertyStatus | null): string {
-  if (!status) return STATUS_PIN_COLORS.available;
-  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.available;
+  if (!status) return STATUS_PIN_COLORS.coming_available_soon;
+  return STATUS_PIN_COLORS[status] ?? STATUS_PIN_COLORS.coming_available_soon;
 }
 
 /** Teardrop pin SVG — tip is at the bottom center of the viewBox. */
@@ -136,7 +134,7 @@ function createMarkerElement(
   el.className = "property-map-marker";
   el.title = property.address;
   el.setAttribute("aria-label", `View ${property.address}`);
-  el.dataset.status = property.status ?? "available";
+  el.dataset.status = property.status ?? "coming_available_soon";
   el.innerHTML = createPinSvg(pinColorForStatus(property.status));
   el.addEventListener("click", (event) => {
     event.stopPropagation();

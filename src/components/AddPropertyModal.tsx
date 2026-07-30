@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 
 import { geocodeAddress } from "@/lib/geocode";
 import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
+import {
+  PROPERTY_STATUSES,
+  propertyStatusLabel,
+} from "@/lib/property-status";
 import { specsForSave, specsToPlainText } from "@/lib/specs";
 import { supabase } from "@/lib/supabase";
 import {
@@ -18,12 +22,7 @@ import type {
   PropertyStatus,
 } from "@/types/database";
 
-const STATUSES: PropertyStatus[] = [
-  "available",
-  "under_offer",
-  "let",
-  "withdrawn",
-];
+const STATUSES = PROPERTY_STATUSES;
 
 const ADDRESS_NOT_FOUND_MESSAGE =
   "Address not found — try adding more detail like postcode or building name.";
@@ -54,6 +53,9 @@ type FormState = {
   cost_per_sqft: string;
   availability_period: string;
   status: PropertyStatus;
+  company: string;
+  building: string;
+  floor: string;
   agent_name: string;
   agent_phone: string;
   agent_email: string;
@@ -77,7 +79,10 @@ const INITIAL_FORM: FormState = {
   size_sqft: "",
   cost_per_sqft: "",
   availability_period: "",
-  status: "available",
+  status: "coming_available_soon",
+  company: "",
+  building: "",
+  floor: "",
   agent_name: "",
   agent_phone: "",
   agent_email: "",
@@ -94,6 +99,9 @@ function propertyToFormState(property: Property): FormState {
       property.cost_per_sqft != null ? String(property.cost_per_sqft) : "",
     availability_period: property.availability_period ?? "",
     status: property.status,
+    company: property.company ?? "",
+    building: property.building ?? "",
+    floor: property.floor ?? "",
     agent_name: property.agent_name ?? "",
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
@@ -110,7 +118,7 @@ function parseOptionalNumber(value: string): number | null {
 }
 
 function statusLabel(status: PropertyStatus): string {
-  return status.replaceAll("_", " ");
+  return propertyStatusLabel(status);
 }
 
 function uploadFailureMessage(fileName: string): string {
@@ -151,6 +159,8 @@ export default function AddPropertyModal({
   const [uploadRetry, setUploadRetry] = useState<PendingUploadRetry | null>(
     null,
   );
+  const [brochureDropActive, setBrochureDropActive] = useState(false);
+  const [imageDropActive, setImageDropActive] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -181,6 +191,44 @@ export default function AddPropertyModal({
     setRemovedFiles((removed) =>
       removed.some((file) => file.id === fileId) ? removed : [...removed, target],
     );
+  }
+
+  function addBrochureFiles(fileList: FileList | File[]) {
+    const selected = Array.from(fileList).filter(
+      (file) =>
+        file.type === "application/pdf" ||
+        file.name.toLowerCase().endsWith(".pdf"),
+    );
+    if (selected.length === 0) return;
+    setBrochures((current) => [...current, ...selected]);
+    setUploadRetry(null);
+  }
+
+  function addImageFiles(fileList: FileList | File[]) {
+    const selected = Array.from(fileList).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    if (selected.length === 0) return;
+    setImages((current) => [...current, ...selected]);
+    setUploadRetry(null);
+  }
+
+  function onDragOver(
+    event: DragEvent<HTMLElement>,
+    setActive: (active: boolean) => void,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setActive(true);
+  }
+
+  function onDragLeave(
+    event: DragEvent<HTMLElement>,
+    setActive: (active: boolean) => void,
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    setActive(false);
   }
 
   const keptBrochures = keptFiles.filter((file) => file.file_type === "brochure");
@@ -358,6 +406,9 @@ export default function AddPropertyModal({
         cost_per_sqft: parseOptionalNumber(form.cost_per_sqft),
         availability_period: form.availability_period.trim() || null,
         status: form.status,
+        company: form.company.trim() || null,
+        building: form.building.trim() || null,
+        floor: form.floor.trim() || null,
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
@@ -729,7 +780,7 @@ export default function AddPropertyModal({
 
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Size (sq ft)
+                  Approx Floor Size
                 </span>
                 <input
                   type="number"
@@ -769,13 +820,47 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block">
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Company
+                </span>
+                <input
+                  value={form.company}
+                  onChange={(e) => updateField("company", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Agent name
                 </span>
                 <input
                   value={form.agent_name}
                   onChange={(e) => updateField("agent_name", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Floor
+                </span>
+                <input
+                  value={form.floor}
+                  onChange={(e) => updateField("floor", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                  placeholder="e.g. 3rd"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Building
+                </span>
+                <input
+                  value={form.building}
+                  onChange={(e) => updateField("building", e.target.value)}
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 />
               </label>
@@ -791,7 +876,7 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block sm:col-span-2">
+              <label className="block">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Agent email
                 </span>
@@ -904,22 +989,43 @@ export default function AddPropertyModal({
                   {isEditing ? "Add brochures (PDF)" : "Brochures (PDF)"}
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
-                  You can select multiple PDF brochures at once.
+                  Drag and drop PDFs here, or choose files. Multiple allowed.
                 </span>
-                <input
-                  type="file"
-                  name="brochures"
-                  accept="application/pdf,.pdf"
-                  multiple
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.files ?? []);
-                    if (selected.length === 0) return;
-                    setBrochures((current) => [...current, ...selected]);
-                    setUploadRetry(null);
-                    e.target.value = "";
+                <label
+                  onDragEnter={(e) => onDragOver(e, setBrochureDropActive)}
+                  onDragOver={(e) => onDragOver(e, setBrochureDropActive)}
+                  onDragLeave={(e) => onDragLeave(e, setBrochureDropActive)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setBrochureDropActive(false);
+                    addBrochureFiles(e.dataTransfer.files);
                   }}
-                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
-                />
+                  className={[
+                    "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition-colors",
+                    brochureDropActive
+                      ? "border-zinc-500 bg-zinc-100"
+                      : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
+                  ].join(" ")}
+                >
+                  <span className="text-sm font-medium text-zinc-800">
+                    Drop PDF brochures here
+                  </span>
+                  <span className="mt-1 text-xs text-zinc-500">
+                    or click to browse
+                  </span>
+                  <input
+                    type="file"
+                    name="brochures"
+                    accept="application/pdf,.pdf"
+                    multiple
+                    onChange={(e) => {
+                      addBrochureFiles(e.target.files ?? []);
+                      e.target.value = "";
+                    }}
+                    className="sr-only"
+                  />
+                </label>
                 {brochures.length > 0 ? (
                   <ul className="mt-3 space-y-2">
                     <li className="text-xs text-zinc-500">
@@ -957,24 +1063,45 @@ export default function AddPropertyModal({
                   {isEditing ? "Add images" : "Images"}
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
-                  You can select multiple images at once (JPEG, PNG, WebP, or GIF).
-                  Each image is uploaded separately and shown in the gallery.
+                  Drag and drop images here, or choose files (JPEG, PNG, WebP, or
+                  GIF). Multiple allowed.
                 </span>
-                <input
-                  type="file"
-                  id="property-images-input"
-                  name="images"
-                  accept="image/jpeg,image/png,image/webp,image/gif,image/*"
-                  multiple={true}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.files ?? []);
-                    if (selected.length === 0) return;
-                    setImages((current) => [...current, ...selected]);
-                    setUploadRetry(null);
-                    e.target.value = "";
+                <label
+                  onDragEnter={(e) => onDragOver(e, setImageDropActive)}
+                  onDragOver={(e) => onDragOver(e, setImageDropActive)}
+                  onDragLeave={(e) => onDragLeave(e, setImageDropActive)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setImageDropActive(false);
+                    addImageFiles(e.dataTransfer.files);
                   }}
-                  className="block w-full text-sm text-zinc-600 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-800 hover:file:bg-zinc-200"
-                />
+                  className={[
+                    "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition-colors",
+                    imageDropActive
+                      ? "border-zinc-500 bg-zinc-100"
+                      : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
+                  ].join(" ")}
+                >
+                  <span className="text-sm font-medium text-zinc-800">
+                    Drop images here
+                  </span>
+                  <span className="mt-1 text-xs text-zinc-500">
+                    or click to browse
+                  </span>
+                  <input
+                    type="file"
+                    id="property-images-input"
+                    name="images"
+                    accept="image/jpeg,image/png,image/webp,image/gif,image/*"
+                    multiple={true}
+                    onChange={(e) => {
+                      addImageFiles(e.target.files ?? []);
+                      e.target.value = "";
+                    }}
+                    className="sr-only"
+                  />
+                </label>
                 {images.length > 0 ? (
                   <ul className="mt-3 space-y-2">
                     <li className="text-xs text-zinc-500">

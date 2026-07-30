@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
 import { propertyStatusLabel } from "@/lib/property-status";
 import { buildStreetViewUrl, openStreetView } from "@/lib/street-view";
+import { formatUkDateTime } from "@/lib/uk-time";
 import type { Property, PropertyFile } from "@/types/database";
 
 type PropertyDetailPanelProps = {
@@ -30,13 +31,7 @@ function formatNumber(value: number | null): string {
 }
 
 function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return formatUkDateTime(value);
 }
 
 function DetailRow({

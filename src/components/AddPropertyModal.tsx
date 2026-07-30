@@ -457,7 +457,7 @@ export default function AddPropertyModal({
         longitude: geocoded.longitude,
         size_sqft: parseOptionalNumber(form.size_sqft),
         availability_period: form.availability_period.trim() || null,
-        status: form.status,
+        status: normalizePropertyStatus(form.status),
         company: form.company.trim() || null,
         building: form.building.trim() || null,
         available_floors: form.available_floors.trim() || null,

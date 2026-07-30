@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { geocodeAddress } from "@/lib/geocode";
+import { geocodeAddress, LONDON_ONLY_MESSAGE } from "@/lib/geocode";
 import {
   defaultAutoDeleteDateInput,
   defaultAutoDeleteHint,
@@ -33,10 +33,10 @@ import type {
   PropertyStatus,
 } from "@/types/database";
 
-const STATUSES = PROPERTY_STATUSES;
-
 const ADDRESS_NOT_FOUND_MESSAGE =
-  "Address not found — try adding more detail like postcode or building name.";
+  "Address not found in London — try adding more detail like postcode or building name.";
+
+const STATUSES = PROPERTY_STATUSES;
 
 export type CreatedPropertyMarker = {
   id: string;
@@ -156,7 +156,10 @@ function uploadFailureMessage(fileName: string): string {
 function isGeocodeNotFoundError(message: string): boolean {
   return (
     message === ADDRESS_NOT_FOUND_MESSAGE ||
-    /no location found|no usable coordinates|address not found/i.test(message)
+    message === LONDON_ONLY_MESSAGE ||
+    /no location found|no usable coordinates|address not found|must be in london/i.test(
+      message,
+    )
   );
 }
 
@@ -451,7 +454,11 @@ export default function AddPropertyModal({
         const message =
           err instanceof Error ? err.message : ADDRESS_NOT_FOUND_MESSAGE;
         if (isGeocodeNotFoundError(message)) {
-          setAddressError(ADDRESS_NOT_FOUND_MESSAGE);
+          setAddressError(
+            message === LONDON_ONLY_MESSAGE
+              ? LONDON_ONLY_MESSAGE
+              : ADDRESS_NOT_FOUND_MESSAGE,
+          );
           return;
         }
         setError(message);
@@ -823,7 +830,7 @@ export default function AddPropertyModal({
                       ? "border-red-400 focus:border-red-500"
                       : "border-zinc-300",
                   ].join(" ")}
-                  placeholder="EC2A 4BX"
+                  placeholder="EC2A 4BX (London)"
                 />
               </label>
 

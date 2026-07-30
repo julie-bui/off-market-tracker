@@ -1,8 +1,8 @@
 export type PropertyStatus =
-  | "available"
-  | "under_offer"
-  | "let"
-  | "withdrawn";
+  | "coming_available_soon"
+  | "under_construction"
+  | "spacepoint_client"
+  | "undergoing_refurbishment";
 
 export type PropertyFileType = "brochure" | "image";
 
@@ -28,6 +28,9 @@ export type Database = {
           cost_per_sqft: number | null;
           availability_period: string | null;
           status: PropertyStatus;
+          company: string | null;
+          building: string | null;
+          floor: string | null;
           agent_name: string | null;
           agent_phone: string | null;
           agent_email: string | null;
@@ -46,6 +49,9 @@ export type Database = {
           cost_per_sqft?: number | null;
           availability_period?: string | null;
           status?: PropertyStatus;
+          company?: string | null;
+          building?: string | null;
+          floor?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;
@@ -64,6 +70,9 @@ export type Database = {
           cost_per_sqft?: number | null;
           availability_period?: string | null;
           status?: PropertyStatus;
+          company?: string | null;
+          building?: string | null;
+          floor?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;
           agent_email?: string | null;

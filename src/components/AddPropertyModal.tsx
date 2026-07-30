@@ -5,8 +5,8 @@ import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } fr
 import { geocodeAddress } from "@/lib/geocode";
 import {
   defaultAutoDeleteHint,
-  resolveAutoDeleteAtFromParts,
-  toAutoDeleteInputParts,
+  resolveAutoDeleteAt,
+  toTimeInputValue,
 } from "@/lib/auto-delete";
 import {
   findSimilarProperty,
@@ -67,7 +67,6 @@ type FormState = {
   agent_phone: string;
   agent_email: string;
   notes: string;
-  auto_delete_date: string;
   auto_delete_time: string;
 };
 
@@ -95,12 +94,10 @@ const INITIAL_FORM: FormState = {
   agent_phone: "",
   agent_email: "",
   notes: "",
-  auto_delete_date: "",
   auto_delete_time: "",
 };
 
 function propertyToFormState(property: Property): FormState {
-  const autoDelete = toAutoDeleteInputParts(property.auto_delete_at);
   return {
     address: property.address,
     postcode: property.postcode ?? "",
@@ -115,8 +112,7 @@ function propertyToFormState(property: Property): FormState {
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
     notes: property.notes ?? "",
-    auto_delete_date: autoDelete.date,
-    auto_delete_time: autoDelete.time,
+    auto_delete_time: toTimeInputValue(property.auto_delete_at),
   };
 }
 
@@ -409,15 +405,12 @@ export default function AddPropertyModal({
 
       let autoDeleteAt: string;
       try {
-        autoDeleteAt = resolveAutoDeleteAtFromParts(
-          form.auto_delete_date,
-          form.auto_delete_time,
-        );
+        autoDeleteAt = resolveAutoDeleteAt(form.auto_delete_time);
       } catch (err) {
         setError(
           err instanceof Error
             ? err.message
-            : "Auto-delete must be a valid date and time.",
+            : "Auto-delete time must be a valid time.",
         );
         return;
       }
@@ -925,42 +918,22 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <div className="sm:col-span-2">
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Auto-delete date & time
+                  Auto-delete time
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
                   {defaultAutoDeleteHint()}
                 </span>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-zinc-600">
-                      Date
-                    </span>
-                    <input
-                      type="date"
-                      value={form.auto_delete_date}
-                      onChange={(e) =>
-                        updateField("auto_delete_date", e.target.value)
-                      }
-                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-medium text-zinc-600">
-                      Time
-                    </span>
-                    <input
-                      type="time"
-                      value={form.auto_delete_time}
-                      onChange={(e) =>
-                        updateField("auto_delete_time", e.target.value)
-                      }
-                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                    />
-                  </label>
-                </div>
-              </div>
+                <input
+                  type="time"
+                  value={form.auto_delete_time}
+                  onChange={(e) =>
+                    updateField("auto_delete_time", e.target.value)
+                  }
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500 sm:max-w-xs"
+                />
+              </label>
 
               {isEditing ? (
                 <div className="space-y-3 sm:col-span-2">

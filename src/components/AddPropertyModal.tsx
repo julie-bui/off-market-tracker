@@ -8,7 +8,6 @@ import {
   PROPERTY_STATUSES,
   propertyStatusLabel,
 } from "@/lib/property-status";
-import { specsForSave, specsToPlainText } from "@/lib/specs";
 import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
@@ -50,16 +49,15 @@ type FormState = {
   address: string;
   postcode: string;
   size_sqft: string;
-  cost_per_sqft: string;
   availability_period: string;
   status: PropertyStatus;
   company: string;
   building: string;
+  available_floors: string;
   floor: string;
   agent_name: string;
   agent_phone: string;
   agent_email: string;
-  specs: string;
   notes: string;
 };
 
@@ -77,16 +75,15 @@ const INITIAL_FORM: FormState = {
   address: "",
   postcode: "",
   size_sqft: "",
-  cost_per_sqft: "",
   availability_period: "",
   status: "coming_available_soon",
   company: "",
   building: "",
+  available_floors: "",
   floor: "",
   agent_name: "",
   agent_phone: "",
   agent_email: "",
-  specs: "",
   notes: "",
 };
 
@@ -95,17 +92,15 @@ function propertyToFormState(property: Property): FormState {
     address: property.address,
     postcode: property.postcode ?? "",
     size_sqft: property.size_sqft != null ? String(property.size_sqft) : "",
-    cost_per_sqft:
-      property.cost_per_sqft != null ? String(property.cost_per_sqft) : "",
     availability_period: property.availability_period ?? "",
     status: property.status,
     company: property.company ?? "",
     building: property.building ?? "",
+    available_floors: property.available_floors ?? "",
     floor: property.floor ?? "",
     agent_name: property.agent_name ?? "",
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
-    specs: specsToPlainText(property.specs),
     notes: property.notes ?? "",
   };
 }
@@ -403,16 +398,15 @@ export default function AddPropertyModal({
         latitude: geocoded.latitude,
         longitude: geocoded.longitude,
         size_sqft: parseOptionalNumber(form.size_sqft),
-        cost_per_sqft: parseOptionalNumber(form.cost_per_sqft),
         availability_period: form.availability_period.trim() || null,
         status: form.status,
         company: form.company.trim() || null,
         building: form.building.trim() || null,
+        available_floors: form.available_floors.trim() || null,
         floor: form.floor.trim() || null,
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
-        specs: specsForSave(form.specs),
         notes: form.notes.trim() || null,
       };
 
@@ -732,7 +726,7 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block">
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Postcode
                 </span>
@@ -750,7 +744,16 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block">
+              {addressError ? (
+                <p
+                  role="alert"
+                  className="sm:col-span-2 -mt-2 text-sm text-red-700"
+                >
+                  {addressError}
+                </p>
+              ) : null}
+
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Status
                 </span>
@@ -769,46 +772,9 @@ export default function AddPropertyModal({
                 </select>
               </label>
 
-              {addressError ? (
-                <p
-                  role="alert"
-                  className="sm:col-span-2 -mt-2 text-sm text-red-700"
-                >
-                  {addressError}
-                </p>
-              ) : null}
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Approx Floor Size
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={form.size_sqft}
-                  onChange={(e) => updateField("size_sqft", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Cost per sq ft
-                </span>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={form.cost_per_sqft}
-                  onChange={(e) => updateField("cost_per_sqft", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
-              </label>
-
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Availability period
+                  Availability
                 </span>
                 <input
                   value={form.availability_period}
@@ -822,12 +788,52 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Company
+                  Building size
                 </span>
                 <input
-                  value={form.company}
-                  onChange={(e) => updateField("company", e.target.value)}
+                  value={form.building}
+                  onChange={(e) => updateField("building", e.target.value)}
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Available floor(s)
+                </span>
+                <input
+                  value={form.available_floors}
+                  onChange={(e) =>
+                    updateField("available_floors", e.target.value)
+                  }
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                  placeholder="e.g. 2nd, 3rd"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Approx Floor Size
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={form.size_sqft}
+                  onChange={(e) => updateField("size_sqft", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Floor
+                </span>
+                <input
+                  value={form.floor}
+                  onChange={(e) => updateField("floor", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                  placeholder="e.g. 3rd"
                 />
               </label>
 
@@ -842,43 +848,20 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block">
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Floor
+                  Agent Company
                 </span>
                 <input
-                  value={form.floor}
-                  onChange={(e) => updateField("floor", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                  placeholder="e.g. 3rd"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Building
-                </span>
-                <input
-                  value={form.building}
-                  onChange={(e) => updateField("building", e.target.value)}
+                  value={form.company}
+                  onChange={(e) => updateField("company", e.target.value)}
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 />
               </label>
 
-              <label className="block">
+              <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Agent phone
-                </span>
-                <input
-                  value={form.agent_phone}
-                  onChange={(e) => updateField("agent_phone", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Agent email
+                  Agent Email
                 </span>
                 <input
                   type="email"
@@ -890,12 +873,11 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Specs
+                  Agent number
                 </span>
-                <textarea
-                  rows={3}
-                  value={form.specs}
-                  onChange={(e) => updateField("specs", e.target.value)}
+                <input
+                  value={form.agent_phone}
+                  onChange={(e) => updateField("agent_phone", e.target.value)}
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 />
               </label>

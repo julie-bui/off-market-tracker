@@ -30,6 +30,7 @@ export type Database = {
           status: PropertyStatus;
           company: string | null;
           building: string | null;
+          available_floors: string | null;
           floor: string | null;
           agent_name: string | null;
           agent_phone: string | null;
@@ -51,6 +52,7 @@ export type Database = {
           status?: PropertyStatus;
           company?: string | null;
           building?: string | null;
+          available_floors?: string | null;
           floor?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;
@@ -72,6 +74,7 @@ export type Database = {
           status?: PropertyStatus;
           company?: string | null;
           building?: string | null;
+          available_floors?: string | null;
           floor?: string | null;
           agent_name?: string | null;
           agent_phone?: string | null;

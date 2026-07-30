@@ -11,7 +11,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
 import { propertyStatusLabel } from "@/lib/property-status";
-import { formatSpecsForDisplay } from "@/lib/specs";
 import { buildStreetViewUrl, openStreetView } from "@/lib/street-view";
 import type { Property, PropertyFile } from "@/types/database";
 
@@ -23,15 +22,6 @@ type PropertyDetailPanelProps = {
   /** Bump to force a refresh after an edit save */
   refreshToken?: number;
 };
-
-function formatCurrency(value: number | null): string {
-  if (value == null || !Number.isFinite(value)) return "—";
-  return new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: "GBP",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatNumber(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -403,6 +393,19 @@ function PropertyDetailContent({
               <DetailRow label="Address" value={property.address} />
               <DetailRow label="Postcode" value={property.postcode ?? "—"} />
               <DetailRow
+                label="Status"
+                value={propertyStatusLabel(property.status)}
+              />
+              <DetailRow
+                label="Availability"
+                value={property.availability_period ?? "—"}
+              />
+              <DetailRow label="Building size" value={property.building ?? "—"} />
+              <DetailRow
+                label="Available floor(s)"
+                value={property.available_floors ?? "—"}
+              />
+              <DetailRow
                 label="Approx Floor Size"
                 value={
                   property.size_sqft != null
@@ -410,39 +413,11 @@ function PropertyDetailContent({
                     : "—"
                 }
               />
-              <DetailRow
-                label="Cost / sq ft"
-                value={formatCurrency(property.cost_per_sqft)}
-              />
-              <DetailRow
-                label="Availability"
-                value={property.availability_period ?? "—"}
-              />
-              <DetailRow
-                label="Status"
-                value={propertyStatusLabel(property.status)}
-              />
-              <DetailRow label="Company" value={property.company ?? "—"} />
-              <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
               <DetailRow label="Floor" value={property.floor ?? "—"} />
-              <DetailRow label="Building" value={property.building ?? "—"} />
+              <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
+              <DetailRow label="Agent Company" value={property.company ?? "—"} />
               <DetailRow
-                label="Agent phone"
-                value={
-                  property.agent_phone ? (
-                    <a
-                      href={`tel:${property.agent_phone}`}
-                      className="text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-600"
-                    >
-                      {property.agent_phone}
-                    </a>
-                  ) : (
-                    "—"
-                  )
-                }
-              />
-              <DetailRow
-                label="Agent email"
+                label="Agent Email"
                 value={
                   property.agent_email ? (
                     <a
@@ -456,7 +431,21 @@ function PropertyDetailContent({
                   )
                 }
               />
-              <DetailRow label="Specs" value={formatSpecsForDisplay(property.specs)} />
+              <DetailRow
+                label="Agent number"
+                value={
+                  property.agent_phone ? (
+                    <a
+                      href={`tel:${property.agent_phone}`}
+                      className="text-zinc-900 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-600"
+                    >
+                      {property.agent_phone}
+                    </a>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
               <DetailRow label="Notes" value={property.notes ?? "—"} />
               <DetailRow
                 label="Created"

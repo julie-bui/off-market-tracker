@@ -3,6 +3,11 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 
 import { geocodeAddress } from "@/lib/geocode";
+import {
+  defaultAutoDeleteHint,
+  resolveAutoDeleteAt,
+  toDateInputValue,
+} from "@/lib/auto-delete";
 import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
 import {
   PROPERTY_STATUSES,
@@ -59,6 +64,7 @@ type FormState = {
   agent_phone: string;
   agent_email: string;
   notes: string;
+  auto_delete_at: string;
 };
 
 type PendingUploadRetry = {
@@ -85,6 +91,7 @@ const INITIAL_FORM: FormState = {
   agent_phone: "",
   agent_email: "",
   notes: "",
+  auto_delete_at: "",
 };
 
 function propertyToFormState(property: Property): FormState {
@@ -102,6 +109,7 @@ function propertyToFormState(property: Property): FormState {
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
     notes: property.notes ?? "",
+    auto_delete_at: toDateInputValue(property.auto_delete_at),
   };
 }
 
@@ -392,6 +400,18 @@ export default function AddPropertyModal({
         return;
       }
 
+      let autoDeleteAt: string;
+      try {
+        autoDeleteAt = resolveAutoDeleteAt(form.auto_delete_at);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Auto-delete date must be a valid date.",
+        );
+        return;
+      }
+
       const payload = {
         address,
         postcode: postcode || null,
@@ -408,6 +428,7 @@ export default function AddPropertyModal({
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
         notes: form.notes.trim() || null,
+        auto_delete_at: autoDeleteAt,
       };
 
       const mutation = isEditing
@@ -890,6 +911,23 @@ export default function AddPropertyModal({
                   rows={3}
                   value={form.notes}
                   onChange={(e) => updateField("notes", e.target.value)}
+                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                />
+              </label>
+
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-sm font-medium text-zinc-700">
+                  Auto-delete date
+                </span>
+                <span className="mb-2 block text-xs text-zinc-500">
+                  {defaultAutoDeleteHint()}
+                </span>
+                <input
+                  type="date"
+                  value={form.auto_delete_at}
+                  onChange={(e) =>
+                    updateField("auto_delete_at", e.target.value)
+                  }
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 />
               </label>

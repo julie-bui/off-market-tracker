@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import {
   PROPERTY_STATUS_PIN_COLORS,
 } from "@/lib/property-status";
+import { purgeExpiredProperties } from "@/lib/purge-expired-properties";
 import type { PropertyStatus } from "@/types/database";
 
 const LONDON_CENTER: [number, number] = [-0.1276, 51.5072];
@@ -251,6 +252,9 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
         hidePoiLayers(map);
 
         void (async () => {
+          await purgeExpiredProperties();
+          if (signal.cancelled) return;
+
           const { data, error } = await supabase
             .from("properties")
             .select("id, address, latitude, longitude, status");

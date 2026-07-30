@@ -448,6 +448,10 @@ function PropertyDetailContent({
               />
               <DetailRow label="Notes" value={property.notes ?? "—"} />
               <DetailRow
+                label="Auto-delete"
+                value={formatDateTime(property.auto_delete_at)}
+              />
+              <DetailRow
                 label="Created"
                 value={formatDateTime(property.created_at)}
               />

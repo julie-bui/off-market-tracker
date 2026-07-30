@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 
 import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
@@ -485,31 +486,34 @@ function PropertyDetailContent({
         </div>
       ) : null}
 
-      {lightboxUrl ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <button
-            type="button"
-            className="absolute inset-0 cursor-default"
-            aria-label="Close image"
-            onClick={() => setLightboxUrl(null)}
-          />
-          <div className="relative z-10 max-h-full max-w-5xl">
-            <button
-              type="button"
-              onClick={() => setLightboxUrl(null)}
-              className="absolute -top-10 right-0 rounded-md px-2 py-1 text-sm text-white/90 hover:bg-white/10"
-            >
-              Close
-            </button>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightboxUrl}
-              alt="Property"
-              className="max-h-[85vh] max-w-full rounded-md object-contain shadow-2xl"
-            />
-          </div>
-        </div>
-      ) : null}
+      {lightboxUrl
+        ? createPortal(
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4">
+              <button
+                type="button"
+                className="absolute inset-0 cursor-default"
+                aria-label="Close image"
+                onClick={() => setLightboxUrl(null)}
+              />
+              <div className="relative z-10 max-h-full max-w-5xl">
+                <button
+                  type="button"
+                  onClick={() => setLightboxUrl(null)}
+                  className="absolute top-0 right-0 z-20 m-2 rounded-md bg-black/50 px-2.5 py-1 text-sm text-white hover:bg-black/70"
+                >
+                  Close
+                </button>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={lightboxUrl}
+                  alt="Property"
+                  className="max-h-[85vh] max-w-full rounded-md object-contain shadow-2xl"
+                />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }
@@ -590,10 +594,10 @@ export default function PropertyDetailPanel({
     <aside
       className={[
         "pointer-events-auto absolute inset-y-0 right-0 z-20 flex w-full flex-col bg-white shadow-xl",
-        isResizing
-          ? ""
-          : "transition-transform duration-300 ease-out",
-        open ? "translate-x-0" : "translate-x-full",
+        isResizing ? "" : "transition-[transform,visibility] duration-300 ease-out",
+        open
+          ? "visible translate-x-0"
+          : "invisible pointer-events-none translate-x-full",
       ].join(" ")}
       style={{ width: panelWidth, maxWidth: "100%" }}
       aria-hidden={!open}

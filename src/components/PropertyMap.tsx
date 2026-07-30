@@ -302,7 +302,7 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
     return (
       <div
         ref={containerRef}
-        className="h-full w-full min-h-[480px]"
+        className="h-full w-full"
         role="region"
         aria-label="Property map"
       />

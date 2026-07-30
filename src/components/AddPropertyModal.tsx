@@ -167,19 +167,45 @@ export default function AddPropertyModal({
   );
   const [brochureDropActive, setBrochureDropActive] = useState(false);
   const [imageDropActive, setImageDropActive] = useState(false);
+  const ignoreCloseUntilRef = useRef(0);
+
+  function markFilePickerOpened() {
+    // Native file dialog Cancel often fires Escape / a ghost click on the backdrop.
+    ignoreCloseUntilRef.current = Date.now() + 800;
+  }
+
+  function requestClose() {
+    if (Date.now() < ignoreCloseUntilRef.current) return;
+    if (brochures.length > 0 || images.length > 0) {
+      setBrochures([]);
+      setImages([]);
+      return;
+    }
+    onClose();
+  }
 
   useEffect(() => {
     if (!open) return;
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !submitting) {
-        onClose();
+      if (event.key !== "Escape" || submitting) return;
+      if (Date.now() < ignoreCloseUntilRef.current) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
       }
+      if (brochures.length > 0 || images.length > 0) {
+        event.preventDefault();
+        setBrochures([]);
+        setImages([]);
+        return;
+      }
+      onClose();
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, submitting]);
+  }, [open, onClose, submitting, brochures.length, images.length]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -625,14 +651,14 @@ export default function AddPropertyModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:items-center sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 p-4 sm:p-6">
       <button
         type="button"
         aria-label="Close dialog backdrop"
         className="absolute inset-0 cursor-default"
         disabled={submitting}
         onClick={() => {
-          if (!submitting) onClose();
+          if (!submitting) requestClose();
         }}
       />
 
@@ -640,9 +666,9 @@ export default function AddPropertyModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative z-10 flex max-h-[min(90vh,880px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+        className="relative z-10 my-auto flex max-h-[min(90dvh,880px)] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-zinc-200 px-5 py-4">
           <div>
             <h2 id={titleId} className="text-lg font-semibold text-zinc-900">
               {isEditing ? "Edit property" : "Add property"}
@@ -666,9 +692,9 @@ export default function AddPropertyModal({
         <form
           id="add-property-form"
           onSubmit={handleSubmit}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
             {error ? (
               <div
                 role="alert"
@@ -1042,6 +1068,7 @@ export default function AddPropertyModal({
                     name="brochures"
                     accept="application/pdf,.pdf"
                     multiple
+                    onClick={markFilePickerOpened}
                     onChange={(e) => {
                       addBrochureFiles(e.target.files ?? []);
                       e.target.value = "";
@@ -1118,6 +1145,7 @@ export default function AddPropertyModal({
                     name="images"
                     accept="image/jpeg,image/png,image/webp,image/gif,image/*"
                     multiple={true}
+                    onClick={markFilePickerOpened}
                     onChange={(e) => {
                       addImageFiles(e.target.files ?? []);
                       e.target.value = "";
@@ -1158,14 +1186,16 @@ export default function AddPropertyModal({
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-5 py-4">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-5 py-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               disabled={submitting}
               className="rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 disabled:opacity-50"
             >
-              Cancel
+              {brochures.length > 0 || images.length > 0
+                ? "Clear files"
+                : "Cancel"}
             </button>
             <button
               type="submit"

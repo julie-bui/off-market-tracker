@@ -6,7 +6,7 @@ import { geocodeAddress } from "@/lib/geocode";
 import {
   defaultAutoDeleteHint,
   resolveAutoDeleteAt,
-  toDateInputValue,
+  toDateTimeLocalInputValue,
 } from "@/lib/auto-delete";
 import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
 import {
@@ -109,7 +109,7 @@ function propertyToFormState(property: Property): FormState {
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
     notes: property.notes ?? "",
-    auto_delete_at: toDateInputValue(property.auto_delete_at),
+    auto_delete_at: toDateTimeLocalInputValue(property.auto_delete_at),
   };
 }
 
@@ -407,7 +407,7 @@ export default function AddPropertyModal({
         setError(
           err instanceof Error
             ? err.message
-            : "Auto-delete date must be a valid date.",
+            : "Auto-delete must be a valid date and time.",
         );
         return;
       }
@@ -917,13 +917,13 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Auto-delete date
+                  Auto-delete date & time
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
                   {defaultAutoDeleteHint()}
                 </span>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={form.auto_delete_at}
                   onChange={(e) =>
                     updateField("auto_delete_at", e.target.value)

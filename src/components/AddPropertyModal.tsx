@@ -5,10 +5,13 @@ import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } fr
 import { geocodeAddress } from "@/lib/geocode";
 import {
   defaultAutoDeleteHint,
-  resolveAutoDeleteAt,
-  toDateTimeLocalInputValue,
+  resolveAutoDeleteAtFromParts,
+  toAutoDeleteInputParts,
 } from "@/lib/auto-delete";
-import { findSimilarProperty, type SimilarProperty } from "@/lib/property-duplicates";
+import {
+  findSimilarProperty,
+  type SimilarProperty,
+} from "@/lib/property-duplicates";
 import {
   PROPERTY_STATUSES,
   propertyStatusLabel,
@@ -64,7 +67,8 @@ type FormState = {
   agent_phone: string;
   agent_email: string;
   notes: string;
-  auto_delete_at: string;
+  auto_delete_date: string;
+  auto_delete_time: string;
 };
 
 type PendingUploadRetry = {
@@ -91,10 +95,12 @@ const INITIAL_FORM: FormState = {
   agent_phone: "",
   agent_email: "",
   notes: "",
-  auto_delete_at: "",
+  auto_delete_date: "",
+  auto_delete_time: "",
 };
 
 function propertyToFormState(property: Property): FormState {
+  const autoDelete = toAutoDeleteInputParts(property.auto_delete_at);
   return {
     address: property.address,
     postcode: property.postcode ?? "",
@@ -109,7 +115,8 @@ function propertyToFormState(property: Property): FormState {
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
     notes: property.notes ?? "",
-    auto_delete_at: toDateTimeLocalInputValue(property.auto_delete_at),
+    auto_delete_date: autoDelete.date,
+    auto_delete_time: autoDelete.time,
   };
 }
 
@@ -402,7 +409,10 @@ export default function AddPropertyModal({
 
       let autoDeleteAt: string;
       try {
-        autoDeleteAt = resolveAutoDeleteAt(form.auto_delete_at);
+        autoDeleteAt = resolveAutoDeleteAtFromParts(
+          form.auto_delete_date,
+          form.auto_delete_time,
+        );
       } catch (err) {
         setError(
           err instanceof Error
@@ -915,22 +925,42 @@ export default function AddPropertyModal({
                 />
               </label>
 
-              <label className="block sm:col-span-2">
+              <div className="sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Auto-delete date & time
                 </span>
                 <span className="mb-2 block text-xs text-zinc-500">
                   {defaultAutoDeleteHint()}
                 </span>
-                <input
-                  type="datetime-local"
-                  value={form.auto_delete_at}
-                  onChange={(e) =>
-                    updateField("auto_delete_at", e.target.value)
-                  }
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                />
-              </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-zinc-600">
+                      Date
+                    </span>
+                    <input
+                      type="date"
+                      value={form.auto_delete_date}
+                      onChange={(e) =>
+                        updateField("auto_delete_date", e.target.value)
+                      }
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-zinc-600">
+                      Time
+                    </span>
+                    <input
+                      type="time"
+                      value={form.auto_delete_time}
+                      onChange={(e) =>
+                        updateField("auto_delete_time", e.target.value)
+                      }
+                      className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                    />
+                  </label>
+                </div>
+              </div>
 
               {isEditing ? (
                 <div className="space-y-3 sm:col-span-2">

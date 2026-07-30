@@ -1,7 +1,7 @@
-/** Default retention when the auto-delete date field is left blank. */
+/** Default retention when the auto-delete date/time field is left blank. */
 export const AUTO_DELETE_DEFAULT_MONTHS = 3;
 
-/** Add calendar months to a date (local time). */
+/** Add calendar months to a date (local time), preserving clock time. */
 export function addMonths(date: Date, months: number): Date {
   const result = new Date(date.getTime());
   const day = result.getDate();
@@ -13,57 +13,54 @@ export function addMonths(date: Date, months: number): Date {
   return result;
 }
 
-/** End of the given local calendar day as an ISO timestamptz string. */
-export function endOfLocalDayIso(date: Date): string {
-  const end = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    23,
-    59,
-    59,
-    999,
-  );
-  return end.toISOString();
-}
-
 /**
- * Resolve the auto-delete timestamp from an optional date input value.
- * Blank / whitespace → now + 3 months (end of that day).
- * A valid yyyy-mm-dd → end of that local day.
+ * Resolve the auto-delete timestamp from an optional datetime-local value.
+ * Blank / whitespace → now + 3 months (same clock time).
+ * A valid yyyy-mm-ddTHH:mm (optional seconds) → that local date/time.
+ * A valid yyyy-mm-dd alone → that local date at 00:00.
  */
 export function resolveAutoDeleteAt(
-  dateInput: string,
+  dateTimeInput: string,
   from: Date = new Date(),
 ): string {
-  const trimmed = dateInput.trim();
+  const trimmed = dateTimeInput.trim();
   if (!trimmed) {
-    return endOfLocalDayIso(addMonths(from, AUTO_DELETE_DEFAULT_MONTHS));
+    return addMonths(from, AUTO_DELETE_DEFAULT_MONTHS).toISOString();
   }
 
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?$/.exec(
+      trimmed,
+    );
   if (!match) {
-    throw new Error("Auto-delete date must be a valid date.");
+    throw new Error("Auto-delete must be a valid date and time.");
   }
 
   const year = Number(match[1]);
   const month = Number(match[2]) - 1;
   const day = Number(match[3]);
-  const parsed = new Date(year, month, day);
+  const hour = match[4] != null ? Number(match[4]) : 0;
+  const minute = match[5] != null ? Number(match[5]) : 0;
+  const second = match[6] != null ? Number(match[6]) : 0;
+
+  const parsed = new Date(year, month, day, hour, minute, second, 0);
   if (
     Number.isNaN(parsed.getTime()) ||
     parsed.getFullYear() !== year ||
     parsed.getMonth() !== month ||
-    parsed.getDate() !== day
+    parsed.getDate() !== day ||
+    parsed.getHours() !== hour ||
+    parsed.getMinutes() !== minute ||
+    parsed.getSeconds() !== second
   ) {
-    throw new Error("Auto-delete date must be a valid date.");
+    throw new Error("Auto-delete must be a valid date and time.");
   }
 
-  return endOfLocalDayIso(parsed);
+  return parsed.toISOString();
 }
 
-/** Format a timestamptz for an HTML date input (yyyy-mm-dd, local). */
-export function toDateInputValue(
+/** Format a timestamptz for an HTML datetime-local input (local). */
+export function toDateTimeLocalInputValue(
   value: string | null | undefined,
 ): string {
   if (!value) return "";
@@ -72,9 +69,18 @@ export function toDateInputValue(
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+/** @deprecated Use toDateTimeLocalInputValue */
+export function toDateInputValue(
+  value: string | null | undefined,
+): string {
+  return toDateTimeLocalInputValue(value);
 }
 
 export function defaultAutoDeleteHint(): string {
-  return `Leave blank to automatically delete this property in ${AUTO_DELETE_DEFAULT_MONTHS} months. Or set a date to choose when it is removed from the database.`;
+  return `Leave blank to automatically delete this property in ${AUTO_DELETE_DEFAULT_MONTHS} months. Or set a date and time to choose when it is removed from the database.`;
 }

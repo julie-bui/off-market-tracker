@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { geocodeAddress } from "@/lib/geocode";
 import {
@@ -167,6 +168,9 @@ export default function AddPropertyModal({
   );
   const [brochureDropActive, setBrochureDropActive] = useState(false);
   const [imageDropActive, setImageDropActive] = useState(false);
+  const [mediaModal, setMediaModal] = useState<"brochure" | "image" | null>(
+    null,
+  );
   const ignoreCloseUntilRef = useRef(0);
 
   function markFilePickerOpened() {
@@ -174,11 +178,16 @@ export default function AddPropertyModal({
     ignoreCloseUntilRef.current = Date.now() + 800;
   }
 
+  function closeMediaModal() {
+    setMediaModal(null);
+    setBrochureDropActive(false);
+    setImageDropActive(false);
+  }
+
   function requestClose() {
     if (Date.now() < ignoreCloseUntilRef.current) return;
-    if (brochures.length > 0 || images.length > 0) {
-      setBrochures([]);
-      setImages([]);
+    if (mediaModal != null) {
+      closeMediaModal();
       return;
     }
     onClose();
@@ -194,10 +203,9 @@ export default function AddPropertyModal({
         event.stopPropagation();
         return;
       }
-      if (brochures.length > 0 || images.length > 0) {
+      if (mediaModal != null) {
         event.preventDefault();
-        setBrochures([]);
-        setImages([]);
+        closeMediaModal();
         return;
       }
       onClose();
@@ -205,7 +213,7 @@ export default function AddPropertyModal({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, submitting, brochures.length, images.length]);
+  }, [open, onClose, submitting, mediaModal]);
 
   function updateField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -1033,51 +1041,28 @@ export default function AddPropertyModal({
                 </div>
               ) : null}
 
-              <div className="block sm:col-span-2">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  {isEditing ? "Add brochures (PDF)" : "Brochures (PDF)"}
-                </span>
-                <span className="mb-2 block text-xs text-zinc-500">
-                  Drag and drop PDFs here, or choose files. Multiple allowed.
-                </span>
-                <label
-                  onDragEnter={(e) => onDragOver(e, setBrochureDropActive)}
-                  onDragOver={(e) => onDragOver(e, setBrochureDropActive)}
-                  onDragLeave={(e) => onDragLeave(e, setBrochureDropActive)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setBrochureDropActive(false);
-                    addBrochureFiles(e.dataTransfer.files);
-                  }}
-                  className={[
-                    "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition-colors",
-                    brochureDropActive
-                      ? "border-zinc-500 bg-zinc-100"
-                      : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
-                  ].join(" ")}
-                >
-                  <span className="text-sm font-medium text-zinc-800">
-                    Drop PDF brochures here
-                  </span>
-                  <span className="mt-1 text-xs text-zinc-500">
-                    or click to browse
-                  </span>
-                  <input
-                    type="file"
-                    name="brochures"
-                    accept="application/pdf,.pdf"
-                    multiple
-                    onClick={markFilePickerOpened}
-                    onChange={(e) => {
-                      addBrochureFiles(e.target.files ?? []);
-                      e.target.value = "";
-                    }}
-                    className="sr-only"
-                  />
-                </label>
+              <div className="sm:col-span-2 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMediaModal("brochure")}
+                    disabled={submitting}
+                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    {isEditing ? "Add brochures" : "Add brochures (PDF)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMediaModal("image")}
+                    disabled={submitting}
+                    className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                  >
+                    {isEditing ? "Add images" : "Add images"}
+                  </button>
+                </div>
+
                 {brochures.length > 0 ? (
-                  <ul className="mt-3 space-y-2">
+                  <ul className="space-y-2">
                     <li className="text-xs text-zinc-500">
                       {brochures.length} brochure
                       {brochures.length === 1 ? "" : "s"} selected
@@ -1106,57 +1091,12 @@ export default function AddPropertyModal({
                     ))}
                   </ul>
                 ) : null}
-              </div>
 
-              <div className="block sm:col-span-2">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  {isEditing ? "Add images" : "Images"}
-                </span>
-                <span className="mb-2 block text-xs text-zinc-500">
-                  Drag and drop images here, or choose files (JPEG, PNG, WebP, or
-                  GIF). Multiple allowed.
-                </span>
-                <label
-                  onDragEnter={(e) => onDragOver(e, setImageDropActive)}
-                  onDragOver={(e) => onDragOver(e, setImageDropActive)}
-                  onDragLeave={(e) => onDragLeave(e, setImageDropActive)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setImageDropActive(false);
-                    addImageFiles(e.dataTransfer.files);
-                  }}
-                  className={[
-                    "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-6 text-center transition-colors",
-                    imageDropActive
-                      ? "border-zinc-500 bg-zinc-100"
-                      : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
-                  ].join(" ")}
-                >
-                  <span className="text-sm font-medium text-zinc-800">
-                    Drop images here
-                  </span>
-                  <span className="mt-1 text-xs text-zinc-500">
-                    or click to browse
-                  </span>
-                  <input
-                    type="file"
-                    id="property-images-input"
-                    name="images"
-                    accept="image/jpeg,image/png,image/webp,image/gif,image/*"
-                    multiple={true}
-                    onClick={markFilePickerOpened}
-                    onChange={(e) => {
-                      addImageFiles(e.target.files ?? []);
-                      e.target.value = "";
-                    }}
-                    className="sr-only"
-                  />
-                </label>
                 {images.length > 0 ? (
-                  <ul className="mt-3 space-y-2">
+                  <ul className="space-y-2">
                     <li className="text-xs text-zinc-500">
-                      {images.length} image{images.length === 1 ? "" : "s"} selected
+                      {images.length} image{images.length === 1 ? "" : "s"}{" "}
+                      selected
                     </li>
                     {images.map((file, index) => (
                       <li
@@ -1189,13 +1129,11 @@ export default function AddPropertyModal({
           <div className="flex shrink-0 items-center justify-end gap-3 border-t border-zinc-200 bg-zinc-50 px-5 py-4">
             <button
               type="button"
-              onClick={requestClose}
+              onClick={onClose}
               disabled={submitting}
               className="rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-200 disabled:opacity-50"
             >
-              {brochures.length > 0 || images.length > 0
-                ? "Clear files"
-                : "Cancel"}
+              Cancel
             </button>
             <button
               type="submit"
@@ -1207,6 +1145,197 @@ export default function AddPropertyModal({
           </div>
         </form>
       </div>
+
+      {mediaModal != null
+        ? createPortal(
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+              <button
+                type="button"
+                aria-label="Close media dialog backdrop"
+                className="absolute inset-0 cursor-default"
+                onClick={closeMediaModal}
+              />
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={
+                  mediaModal === "brochure" ? "Add brochures" : "Add images"
+                }
+                className="relative z-10 w-full max-w-md rounded-lg bg-white p-5 shadow-xl"
+              >
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-zinc-900">
+                      {mediaModal === "brochure"
+                        ? "Add brochures (PDF)"
+                        : "Add images"}
+                    </h3>
+                    <p className="mt-1 text-xs text-zinc-500">
+                      {mediaModal === "brochure"
+                        ? "Drag and drop PDFs here, or choose files. Multiple allowed."
+                        : "Drag and drop images here, or choose files (JPEG, PNG, WebP, or GIF). Multiple allowed."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeMediaModal}
+                    className="rounded-md px-2 py-1 text-sm text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {mediaModal === "brochure" ? (
+                  <label
+                    onDragEnter={(e) => onDragOver(e, setBrochureDropActive)}
+                    onDragOver={(e) => onDragOver(e, setBrochureDropActive)}
+                    onDragLeave={(e) => onDragLeave(e, setBrochureDropActive)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setBrochureDropActive(false);
+                      addBrochureFiles(e.dataTransfer.files);
+                    }}
+                    className={[
+                      "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-10 text-center transition-colors",
+                      brochureDropActive
+                        ? "border-zinc-500 bg-zinc-100"
+                        : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
+                    ].join(" ")}
+                  >
+                    <span className="text-sm font-medium text-zinc-800">
+                      Drop PDF brochures here
+                    </span>
+                    <span className="mt-1 text-xs text-zinc-500">
+                      or click to browse
+                    </span>
+                    <input
+                      type="file"
+                      name="brochures"
+                      accept="application/pdf,.pdf"
+                      multiple
+                      onClick={markFilePickerOpened}
+                      onChange={(e) => {
+                        addBrochureFiles(e.target.files ?? []);
+                        e.target.value = "";
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                ) : (
+                  <label
+                    onDragEnter={(e) => onDragOver(e, setImageDropActive)}
+                    onDragOver={(e) => onDragOver(e, setImageDropActive)}
+                    onDragLeave={(e) => onDragLeave(e, setImageDropActive)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setImageDropActive(false);
+                      addImageFiles(e.dataTransfer.files);
+                    }}
+                    className={[
+                      "flex cursor-pointer flex-col items-center justify-center rounded-md border border-dashed px-4 py-10 text-center transition-colors",
+                      imageDropActive
+                        ? "border-zinc-500 bg-zinc-100"
+                        : "border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100",
+                    ].join(" ")}
+                  >
+                    <span className="text-sm font-medium text-zinc-800">
+                      Drop images here
+                    </span>
+                    <span className="mt-1 text-xs text-zinc-500">
+                      or click to browse
+                    </span>
+                    <input
+                      type="file"
+                      name="images"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/*"
+                      multiple
+                      onClick={markFilePickerOpened}
+                      onChange={(e) => {
+                        addImageFiles(e.target.files ?? []);
+                        e.target.value = "";
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
+
+                {mediaModal === "brochure" && brochures.length > 0 ? (
+                  <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto">
+                    {brochures.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      >
+                        <span className="truncate text-sm text-zinc-800">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBrochures((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                          className="rounded-md px-2 py-0.5 text-sm text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {mediaModal === "image" && images.length > 0 ? (
+                  <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto">
+                    {images.map((file, index) => (
+                      <li
+                        key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                        className="flex items-center justify-between gap-3 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2"
+                      >
+                        <span className="truncate text-sm text-zinc-800">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImages((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                          className="rounded-md px-2 py-0.5 text-sm text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          ✕
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeMediaModal}
+                    className="rounded-md px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeMediaModal}
+                    className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

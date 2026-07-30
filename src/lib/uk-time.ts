@@ -87,10 +87,15 @@ export function formatUkDateTime(value: string | Date | null | undefined): strin
   if (value == null || value === "") return "—";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
+  // Do not mix dateStyle/timeStyle with timeZoneName — that throws in browsers.
   return new Intl.DateTimeFormat("en-GB", {
     timeZone: UK_TIME_ZONE,
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
     timeZoneName: "short",
   }).format(date);
 }

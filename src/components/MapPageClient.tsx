@@ -125,7 +125,7 @@ export default function MapPageClient() {
         </button>
       </header>
 
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 overflow-hidden">
         <PropertyMap
           ref={mapRef}
           onPropertySelect={handlePropertySelect}

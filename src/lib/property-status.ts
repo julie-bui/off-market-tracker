@@ -5,6 +5,7 @@ export const PROPERTY_STATUSES: PropertyStatus[] = [
   "under_construction",
   "spacepoint_client",
   "undergoing_refurbishment",
+  "has_planning_permission",
 ];
 
 export const PROPERTY_STATUS_LABELS: Record<PropertyStatus, string> = {
@@ -12,6 +13,7 @@ export const PROPERTY_STATUS_LABELS: Record<PropertyStatus, string> = {
   under_construction: "Under Construction",
   spacepoint_client: "Spacepoint Client",
   undergoing_refurbishment: "Undergoing Re-furbishment",
+  has_planning_permission: "Has Planning Permission",
 };
 
 export const PROPERTY_STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
@@ -19,6 +21,7 @@ export const PROPERTY_STATUS_PIN_COLORS: Record<PropertyStatus, string> = {
   under_construction: "#d97706", // amber
   spacepoint_client: "#2563eb", // blue
   undergoing_refurbishment: "#7c3aed", // violet
+  has_planning_permission: "#db2777", // pink
 };
 
 /** Map legacy DB statuses (pre-migration) onto the current options. */

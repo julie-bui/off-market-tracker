@@ -2,7 +2,8 @@ export type PropertyStatus =
   | "coming_available_soon"
   | "under_construction"
   | "spacepoint_client"
-  | "undergoing_refurbishment";
+  | "undergoing_refurbishment"
+  | "has_planning_permission";
 
 export type PropertyFileType = "brochure" | "image";
 

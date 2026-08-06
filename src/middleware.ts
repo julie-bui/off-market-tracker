@@ -2,12 +2,28 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
 
-function isAuthRoute(pathname: string): boolean {
+function isPublicAuthRoute(pathname: string): boolean {
   return (
     pathname === "/login" ||
     pathname.startsWith("/login/") ||
     pathname === "/signup" ||
-    pathname.startsWith("/signup/")
+    pathname.startsWith("/signup/") ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/forgot-password/") ||
+    pathname === "/reset-password" ||
+    pathname.startsWith("/reset-password/") ||
+    pathname.startsWith("/auth/callback")
+  );
+}
+
+function isGuestOnlyRoute(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/signup" ||
+    pathname.startsWith("/signup/") ||
+    pathname === "/forgot-password" ||
+    pathname.startsWith("/forgot-password/")
   );
 }
 
@@ -15,19 +31,22 @@ export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
-  if (!user && !isAuthRoute(pathname)) {
+  if (!user && !isPublicAuthRoute(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+
     if (pathname !== "/") {
       url.searchParams.set("next", pathname);
     }
+
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute(pathname)) {
+  if (user && isGuestOnlyRoute(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
+
     return NextResponse.redirect(url);
   }
 

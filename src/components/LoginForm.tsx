@@ -82,6 +82,15 @@ export default function LoginForm() {
         />
       </label>
 
+      <div className="text-right">
+        <Link
+          href="/forgot-password"
+          className="text-sm font-medium text-zinc-700 underline decoration-zinc-300 underline-offset-2 hover:text-zinc-900 hover:decoration-zinc-600"
+        >
+          Forgot password?
+        </Link>
+      </div>
+
       <button
         type="submit"
         disabled={submitting}

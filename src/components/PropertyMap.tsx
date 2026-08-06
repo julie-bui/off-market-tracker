@@ -34,6 +34,7 @@ export type PropertyMapHandle = {
   addMarker: (property: PropertyMarkerData) => void;
   updateMarker: (property: PropertyMarkerData) => void;
   removeMarker: (propertyId: string) => void;
+  flyTo: (coords: { latitude: number; longitude: number }) => void;
 };
 
 type PropertyMapProps = {
@@ -222,7 +223,17 @@ const PropertyMap = forwardRef<PropertyMapHandle, PropertyMapProps>(
         markersByIdRef.current.delete(propertyId);
       }
 
-      return { addMarker, updateMarker, removeMarker };
+      function flyTo(coords: { latitude: number; longitude: number }) {
+        const map = mapRef.current;
+        if (!map) return;
+
+        map.flyTo({
+          center: [coords.longitude, coords.latitude],
+          zoom: Math.max(map.getZoom(), DEFAULT_ZOOM),
+        });
+      }
+
+      return { addMarker, updateMarker, removeMarker, flyTo };
     });
 
     useEffect(() => {

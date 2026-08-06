@@ -75,6 +75,23 @@ export default function MapPageClient() {
 
   const handleViewExisting = useCallback((propertyId: string) => {
     setSelectedPropertyId(propertyId);
+
+    void (async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("latitude, longitude")
+        .eq("id", propertyId)
+        .single();
+
+      if (error || !data || data.latitude == null || data.longitude == null) {
+        return;
+      }
+
+      mapRef.current?.flyTo({
+        latitude: data.latitude,
+        longitude: data.longitude,
+      });
+    })();
   }, []);
 
   const handleLogout = useCallback(async () => {

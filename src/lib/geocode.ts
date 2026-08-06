@@ -58,6 +58,28 @@ export function isWithinLondon(latitude: number, longitude: number): boolean {
   );
 }
 
+function normalizeForComparison(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, "");
+}
+
+/**
+ * Join address + postcode into one geocode query, without repeating the
+ * postcode if the user already typed it as part of the free-text address
+ * (e.g. address "1 Poultry, London EC2R 8EJ" + postcode "EC2R 8EJ").
+ */
+export function buildGeocodeQuery(address: string, postcode: string): string {
+  const trimmedAddress = address.trim();
+  const trimmedPostcode = postcode.trim();
+  if (!trimmedPostcode) return trimmedAddress;
+
+  const normalizedPostcode = normalizeForComparison(trimmedPostcode);
+  if (normalizeForComparison(trimmedAddress).includes(normalizedPostcode)) {
+    return trimmedAddress;
+  }
+
+  return [trimmedAddress, trimmedPostcode].filter(Boolean).join(", ");
+}
+
 /** Prefer queries that already mention London/UK; otherwise append it. */
 export function withLondonContext(query: string): string {
   const trimmed = query.trim();
@@ -191,7 +213,13 @@ export async function geocodeAddress(
     // MapTiler's array order, so identical queries resolve deterministically
     // even when several candidates have close relevance scores.
     withinLondon.sort((a, b) => b.relevance - a.relevance);
-    return withinLondon[0];
+    const chosen = withinLondon[0];
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[geocode] chosen result for %o:", londonQuery, chosen);
+    }
+
+    return chosen;
   }
 
   if (features.length > 0) {

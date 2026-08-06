@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } fr
 import { createPortal } from "react-dom";
 
 import {
+  buildGeocodeQuery,
   geocodeAddress,
   isLowConfidenceMatch,
   LONDON_ONLY_MESSAGE,
@@ -442,7 +443,7 @@ export default function AddPropertyModal({
     }
 
     const postcode = form.postcode.trim();
-    const query = [address, postcode].filter(Boolean).join(", ");
+    const query = buildGeocodeQuery(address, postcode);
 
     submittingRef.current = true;
     setSubmitting(true);
@@ -474,6 +475,16 @@ export default function AddPropertyModal({
         }
         setError(message);
         return;
+      }
+
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[AddPropertyModal] geocoded result:", {
+          query,
+          latitude: geocoded.latitude,
+          longitude: geocoded.longitude,
+          relevance: geocoded.relevance,
+          placeName: geocoded.placeName,
+        });
       }
 
       if (
@@ -519,6 +530,13 @@ export default function AddPropertyModal({
         auto_delete_at: autoDeleteAt,
       };
 
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[AddPropertyModal] payload being saved to Supabase:", {
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+        });
+      }
+
       const mutation = isEditing
         ? supabase
             .from("properties")
@@ -552,6 +570,13 @@ export default function AddPropertyModal({
         throw new Error("Property saved without coordinates.");
       }
 
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[AddPropertyModal] coordinates read back from Supabase:", {
+          latitude: property.latitude,
+          longitude: property.longitude,
+        });
+      }
+
       const markerPayload: CreatedPropertyMarker = {
         id: property.id,
         address: property.address,
@@ -559,6 +584,13 @@ export default function AddPropertyModal({
         longitude: property.longitude,
         status: (property.status ?? form.status) as PropertyStatus,
       };
+
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(
+          "[AddPropertyModal] marker payload handed to the map (setLngLat order is [longitude, latitude]):",
+          markerPayload,
+        );
+      }
 
       try {
         await attachFiles(property.id, brochures, images);

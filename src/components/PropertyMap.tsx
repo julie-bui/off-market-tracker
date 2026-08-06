@@ -149,6 +149,16 @@ function createPropertyMarker(
   property: PropertyMarkerData,
   onSelect: (propertyId: string) => void,
 ): maplibregl.Marker {
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[PropertyMap] setLngLat for marker:", {
+      id: property.id,
+      address: property.address,
+      latitude: property.latitude,
+      longitude: property.longitude,
+      lngLatArg: [property.longitude, property.latitude],
+    });
+  }
+
   return new maplibregl.Marker({
     element: createMarkerElement(property, onSelect),
     anchor: "bottom",

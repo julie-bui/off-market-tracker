@@ -419,6 +419,8 @@ export default function AddPropertyModal({
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    console.debug("[AddPropertyModal] handleSubmit called");
+
     event.preventDefault();
 
     // Synchronous guard — React state alone cannot block double-submit races.
@@ -434,6 +436,7 @@ export default function AddPropertyModal({
       return;
     }
 
+    console.debug("[AddPropertyModal] before maptilerKey check");
     const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
     if (!maptilerKey) {
       setError(
@@ -441,6 +444,7 @@ export default function AddPropertyModal({
       );
       return;
     }
+    console.debug("[AddPropertyModal] after maptilerKey check — key present, continuing");
 
     const postcode = form.postcode.trim();
     const query = buildGeocodeQuery(address, postcode);

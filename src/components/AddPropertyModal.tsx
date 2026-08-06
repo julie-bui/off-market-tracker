@@ -3,7 +3,12 @@
 import { useEffect, useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { geocodeAddress, LONDON_ONLY_MESSAGE } from "@/lib/geocode";
+import {
+  geocodeAddress,
+  isLowConfidenceMatch,
+  LONDON_ONLY_MESSAGE,
+  type GeocodeResult,
+} from "@/lib/geocode";
 import {
   defaultAutoDeleteDateInput,
   defaultAutoDeleteHint,
@@ -187,6 +192,9 @@ export default function AddPropertyModal({
   const [addressError, setAddressError] = useState<string | null>(null);
   const [duplicate, setDuplicate] = useState<SimilarProperty | null>(null);
   const duplicateIgnoredRef = useRef(false);
+  const [lowConfidenceMatch, setLowConfidenceMatch] =
+    useState<GeocodeResult | null>(null);
+  const lowConfidenceIgnoredRef = useRef(false);
   const [uploadRetry, setUploadRetry] = useState<PendingUploadRetry | null>(
     null,
   );
@@ -245,6 +253,8 @@ export default function AddPropertyModal({
       setAddressError(null);
       setDuplicate(null);
       duplicateIgnoredRef.current = false;
+      setLowConfidenceMatch(null);
+      lowConfidenceIgnoredRef.current = false;
     }
   }
 
@@ -465,6 +475,14 @@ export default function AddPropertyModal({
         return;
       }
 
+      if (
+        !lowConfidenceIgnoredRef.current &&
+        isLowConfidenceMatch(geocoded.relevance)
+      ) {
+        setLowConfidenceMatch(geocoded);
+        return;
+      }
+
       let autoDeleteAt: string | null;
       try {
         autoDeleteAt = resolveAutoDeleteAt({
@@ -681,6 +699,18 @@ export default function AddPropertyModal({
     });
   }
 
+  function handleContinueDespiteLowConfidence() {
+    // Ref must flip synchronously so the re-submit sees the acknowledgment.
+    lowConfidenceIgnoredRef.current = true;
+    setLowConfidenceMatch(null);
+    queueMicrotask(() => {
+      const formEl = document.getElementById(
+        "add-property-form",
+      ) as HTMLFormElement | null;
+      formEl?.requestSubmit();
+    });
+  }
+
   function handleViewExistingDuplicate() {
     if (!duplicate) return;
     const id = duplicate.id;
@@ -791,6 +821,39 @@ export default function AddPropertyModal({
                     className="rounded-md px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
                   >
                     Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {lowConfidenceMatch ? (
+              <div
+                role="status"
+                className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
+              >
+                <p>
+                  This address matched “{lowConfidenceMatch.placeName}” with
+                  low confidence (
+                  {Math.round(lowConfidenceMatch.relevance * 100)}% match).
+                  Please confirm the pin location is correct, or adjust the
+                  address/postcode above for a better match, before saving.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={handleContinueDespiteLowConfidence}
+                    disabled={submitting}
+                    className="rounded-md bg-amber-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-950 disabled:opacity-60"
+                  >
+                    Confirm pin location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLowConfidenceMatch(null)}
+                    disabled={submitting}
+                    className="rounded-md px-3 py-1.5 text-sm font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                  >
+                    Let me adjust it
                   </button>
                 </div>
               </div>
@@ -1221,7 +1284,7 @@ export default function AddPropertyModal({
             </button>
             <button
               type="submit"
-              disabled={submitting || duplicate != null}
+              disabled={submitting || duplicate != null || lowConfidenceMatch != null}
               className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Saving…" : isEditing ? "Save changes" : "Save property"}

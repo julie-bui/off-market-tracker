@@ -2,11 +2,14 @@ export type GeocodeResult = {
   latitude: number;
   longitude: number;
   placeName: string;
+  /** MapTiler match confidence, 0–1. Missing scores are treated as fully confident (1). */
+  relevance: number;
 };
 
 type MapTilerGeocodingFeature = {
   center?: [number, number];
   place_name?: string;
+  relevance?: number;
   geometry?: {
     type?: string;
     coordinates?: [number, number] | number[];
@@ -33,6 +36,13 @@ export const LONDON_PROXIMITY: [number, number] = [-0.1276, 51.5072];
 
 export const LONDON_ONLY_MESSAGE =
   "Address must be in London, UK. Try a London street address or postcode.";
+
+/** Below this MapTiler relevance score, ask the user to confirm/adjust the pin. */
+export const LOW_CONFIDENCE_RELEVANCE_THRESHOLD = 0.7;
+
+export function isLowConfidenceMatch(relevance: number): boolean {
+  return relevance < LOW_CONFIDENCE_RELEVANCE_THRESHOLD;
+}
 
 const ADDRESS_NOT_FOUND_MESSAGE =
   "Address not found in London — try adding more detail like postcode or building name.";
@@ -142,10 +152,16 @@ export async function geocodeAddress(
     const [longitude, latitude] = coords;
     if (!isWithinLondon(latitude, longitude)) continue;
 
+    const relevance =
+      typeof feature.relevance === "number" && Number.isFinite(feature.relevance)
+        ? feature.relevance
+        : 1;
+
     return {
       latitude,
       longitude,
       placeName: feature.place_name ?? trimmed,
+      relevance,
     };
   }
 

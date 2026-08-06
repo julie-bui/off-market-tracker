@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 
 import {
   buildGeocodeQuery,
+  describeLocationType,
   geocodeAddress,
   isLowConfidenceMatch,
   LONDON_ONLY_MESSAGE,
@@ -436,16 +437,6 @@ export default function AddPropertyModal({
       return;
     }
 
-    console.debug("[AddPropertyModal] before maptilerKey check");
-    const maptilerKey = process.env.NEXT_PUBLIC_MAPTILER_KEY;
-    if (!maptilerKey) {
-      setError(
-        "Missing NEXT_PUBLIC_MAPTILER_KEY. Add it to .env.local to geocode addresses.",
-      );
-      return;
-    }
-    console.debug("[AddPropertyModal] after maptilerKey check — key present, continuing");
-
     const postcode = form.postcode.trim();
     const query = buildGeocodeQuery(address, postcode);
 
@@ -465,7 +456,7 @@ export default function AddPropertyModal({
 
       let geocoded;
       try {
-        geocoded = await geocodeAddress(query, maptilerKey);
+        geocoded = await geocodeAddress(query);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : ADDRESS_NOT_FOUND_MESSAGE;
@@ -486,14 +477,14 @@ export default function AddPropertyModal({
           query,
           latitude: geocoded.latitude,
           longitude: geocoded.longitude,
-          relevance: geocoded.relevance,
+          locationType: geocoded.locationType,
           placeName: geocoded.placeName,
         });
       }
 
       if (
         !lowConfidenceIgnoredRef.current &&
-        isLowConfidenceMatch(geocoded.relevance)
+        isLowConfidenceMatch(geocoded.locationType)
       ) {
         setLowConfidenceMatch(geocoded);
         return;
@@ -869,9 +860,9 @@ export default function AddPropertyModal({
                 className="space-y-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950"
               >
                 <p>
-                  This address matched “{lowConfidenceMatch.placeName}” with
-                  low confidence (
-                  {Math.round(lowConfidenceMatch.relevance * 100)}% match).
+                  This address matched “{lowConfidenceMatch.placeName}”, but
+                  Google could only provide{" "}
+                  {describeLocationType(lowConfidenceMatch.locationType)}.
                   Please confirm the pin location is correct, or adjust the
                   address/postcode above for a better match, before saving.
                 </p>

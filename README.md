@@ -7,6 +7,7 @@ Next.js property tracker backed by Supabase Auth, Postgres, and Storage.
 - **Next.js** (App Router) + **TypeScript** + **Tailwind CSS**
 - **Supabase** (Auth + Postgres + Storage)
 - **MapLibre** + **MapTiler** basemap
+- **Google Geocoding API** (via a server-side `/api/geocode` route) for address lookup
 
 ## Setup
 
@@ -23,7 +24,9 @@ cp .env.local.example .env.local
 ```
 
 Fill in your Supabase project URL and anon key from **Project Settings → API**,
-a server-only `INVITE_CODE` for sign-up, plus a MapTiler key for the map.
+a server-only `INVITE_CODE` for sign-up, a MapTiler key for the map, and a
+server-only `GOOGLE_GEOCODING_API_KEY` (Google Cloud Console → APIs & Services
+→ Credentials, with the Geocoding API enabled) used by `/api/geocode`.
 
 ### 3. Apply the database schema
 
@@ -60,7 +63,7 @@ shared `INVITE_CODE` (validated server-side before Supabase Auth sign-up).
 
 ```
 src/
-  app/                  # App Router (/, /login, /signup)
+  app/                  # App Router (/, /login, /signup, /api/geocode)
   components/           # Map, forms, detail panel, auth forms
   lib/supabase/         # Browser + server clients, middleware helper
   middleware.ts         # Session refresh + auth redirects

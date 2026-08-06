@@ -144,7 +144,28 @@ export async function geocodeAddress(
   const data = (await response.json()) as MapTilerGeocodingResponse;
   const features = data.features ?? [];
 
-  // Prefer the first London-in-bbox result (API may still return near-misses).
+  if (process.env.NODE_ENV !== "production") {
+    // Diagnostic aid: MapTiler's array order for ambiguous/low-relevance
+    // queries is not guaranteed stable between identical requests. Logging
+    // the raw candidates makes that visible instead of just picking one.
+    console.debug(
+      "[geocode] raw MapTiler candidates for %o:",
+      londonQuery,
+      features.map((feature) => ({
+        place_name: feature.place_name,
+        relevance: feature.relevance,
+        coords: featureCoordinates(feature),
+      })),
+    );
+  }
+
+  const withinLondon: Array<{
+    latitude: number;
+    longitude: number;
+    placeName: string;
+    relevance: number;
+  }> = [];
+
   for (const feature of features) {
     const coords = featureCoordinates(feature);
     if (!coords) continue;
@@ -157,12 +178,20 @@ export async function geocodeAddress(
         ? feature.relevance
         : 1;
 
-    return {
+    withinLondon.push({
       latitude,
       longitude,
       placeName: feature.place_name ?? trimmed,
       relevance,
-    };
+    });
+  }
+
+  if (withinLondon.length > 0) {
+    // Pick the highest-relevance in-bbox candidate rather than trusting
+    // MapTiler's array order, so identical queries resolve deterministically
+    // even when several candidates have close relevance scores.
+    withinLondon.sort((a, b) => b.relevance - a.relevance);
+    return withinLondon[0];
   }
 
   if (features.length > 0) {

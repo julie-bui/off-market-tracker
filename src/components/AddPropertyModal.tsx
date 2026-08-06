@@ -25,6 +25,7 @@ import {
   propertyStatusLabel,
   normalizePropertyStatus,
 } from "@/lib/property-status";
+import GeocodePreviewMap from "@/components/GeocodePreviewMap";
 import { supabase } from "@/lib/supabase";
 import {
   uploadBrochure,
@@ -838,6 +839,11 @@ export default function AddPropertyModal({
                   Please confirm the pin location is correct, or adjust the
                   address/postcode above for a better match, before saving.
                 </p>
+                <GeocodePreviewMap
+                  latitude={lowConfidenceMatch.latitude}
+                  longitude={lowConfidenceMatch.longitude}
+                  label={lowConfidenceMatch.placeName}
+                />
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"

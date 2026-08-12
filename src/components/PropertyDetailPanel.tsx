@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { deletePropertyWithFiles } from "@/lib/property-uploads";
 import { propertyStatusLabel } from "@/lib/property-status";
 import { buildStreetViewUrl, openStreetView } from "@/lib/street-view";
-import { formatUkDateTime } from "@/lib/uk-time";
+import { formatUkDate, formatUkDateTime } from "@/lib/uk-time";
 import type { Property, PropertyFile } from "@/types/database";
 
 type PropertyDetailPanelProps = {
@@ -398,7 +398,7 @@ function PropertyDetailContent({
               />
               <DetailRow label="Building size" value={property.building ?? "—"} />
               <DetailRow
-                label="No. available floor(s)"
+                label="Available floors"
                 value={property.available_floors ?? "—"}
               />
               <DetailRow
@@ -409,7 +409,6 @@ function PropertyDetailContent({
                     : "—"
                 }
               />
-              <DetailRow label="Floor/demise" value={property.floor ?? "—"} />
               <DetailRow label="Agent name" value={property.agent_name ?? "—"} />
               <DetailRow label="Agent Company" value={property.company ?? "—"} />
               <DetailRow
@@ -447,7 +446,7 @@ function PropertyDetailContent({
                 label="Auto-delete"
                 value={
                   property.auto_delete_at
-                    ? formatDateTime(property.auto_delete_at)
+                    ? formatUkDate(property.auto_delete_at)
                     : "Keep forever"
                 }
               />

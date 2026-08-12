@@ -10,6 +10,11 @@ import PropertyDetailPanel from "@/components/PropertyDetailPanel";
 import PropertyMap, {
   type PropertyMapHandle,
 } from "@/components/PropertyMap";
+import {
+  PROPERTY_STATUSES,
+  PROPERTY_STATUS_LABELS,
+  PROPERTY_STATUS_PIN_COLORS,
+} from "@/lib/property-status";
 import { supabase } from "@/lib/supabase";
 import type { Property, PropertyFile } from "@/types/database";
 
@@ -125,6 +130,28 @@ export default function MapPageClient() {
           >
             Add Property
           </button>
+
+          <div className="w-48 rounded-md bg-white/90 px-3 py-2.5 shadow-sm backdrop-blur sm:w-52">
+            <p className="text-xs font-medium tracking-wide text-zinc-500 uppercase">
+              Status
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {PROPERTY_STATUSES.map((status) => (
+                <li key={status} className="flex items-start gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                    style={{
+                      backgroundColor: PROPERTY_STATUS_PIN_COLORS[status],
+                    }}
+                  />
+                  <span className="text-xs leading-snug break-words text-zinc-700">
+                    {PROPERTY_STATUS_LABELS[status]}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         {/*

@@ -99,7 +99,7 @@ const INITIAL_FORM: FormState = {
   postcode: "",
   size_sqft: "",
   availability_period: "",
-  status: "coming_available_soon",
+  status: PROPERTY_STATUSES[0],
   company: "",
   building: "",
   available_floors: "",
@@ -950,6 +950,11 @@ export default function AddPropertyModal({
                   }
                   className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
                 >
+                  {!STATUSES.includes(form.status) ? (
+                    <option value={form.status}>
+                      {statusLabel(form.status)}
+                    </option>
+                  ) : null}
                   {STATUSES.map((status) => (
                     <option key={status} value={status}>
                       {statusLabel(status)}

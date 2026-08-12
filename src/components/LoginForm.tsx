@@ -14,6 +14,9 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const resetSucceeded = searchParams.get("password-reset") === "success";
+  const resetLinkInvalid = searchParams.get("error") === "invalid-reset-link";
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -42,6 +45,31 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {resetSucceeded ? (
+        <div
+          role="status"
+          className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800"
+        >
+          Your password has been updated. Please log in with your new password.
+        </div>
+      ) : null}
+
+      {resetLinkInvalid ? (
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
+          That password reset link is invalid or has expired.{" "}
+          <Link
+            href="/forgot-password"
+            className="font-medium underline decoration-red-300 underline-offset-2 hover:decoration-red-600"
+          >
+            Request a new one
+          </Link>
+          .
+        </div>
+      ) : null}
+
       {error ? (
         <div
           role="alert"

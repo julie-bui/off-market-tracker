@@ -1,17 +1,34 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
 
+type SessionState = "checking" | "valid" | "missing";
+
 export default function ResetPasswordForm() {
   const router = useRouter();
 
+  const [sessionState, setSessionState] = useState<SessionState>("checking");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setSessionState(data.session ? "valid" : "missing");
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,6 +68,32 @@ export default function ResetPasswordForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (sessionState === "checking") {
+    return (
+      <p className="text-sm text-zinc-500">Checking your reset link…</p>
+    );
+  }
+
+  if (sessionState === "missing") {
+    return (
+      <div className="space-y-4">
+        <div
+          role="alert"
+          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+        >
+          This password reset link is invalid, expired, or has already been
+          used.
+        </div>
+        <Link
+          href="/forgot-password"
+          className="inline-flex w-full items-center justify-center rounded-md bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-800"
+        >
+          Request a new reset link
+        </Link>
+      </div>
+    );
   }
 
   return (

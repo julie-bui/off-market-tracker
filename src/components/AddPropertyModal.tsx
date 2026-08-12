@@ -983,7 +983,7 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  No. available floor(s)
+                  Available floors
                 </span>
                 <input
                   value={form.available_floors}

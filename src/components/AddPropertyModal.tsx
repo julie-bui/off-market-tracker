@@ -16,7 +16,6 @@ import {
   defaultAutoDeleteHint,
   resolveAutoDeleteAt,
   toDateInputValue,
-  toTimeInputValue,
 } from "@/lib/auto-delete";
 import {
   findSimilarProperty,
@@ -74,14 +73,12 @@ type FormState = {
   company: string;
   building: string;
   available_floors: string;
-  floor: string;
   agent_name: string;
   agent_phone: string;
   agent_email: string;
   notes: string;
   auto_delete_enabled: boolean;
   auto_delete_date: string;
-  auto_delete_time: string;
 };
 
 type PendingUploadRetry = {
@@ -103,14 +100,12 @@ const INITIAL_FORM: FormState = {
   company: "",
   building: "",
   available_floors: "",
-  floor: "",
   agent_name: "",
   agent_phone: "",
   agent_email: "",
   notes: "",
   auto_delete_enabled: true,
   auto_delete_date: "",
-  auto_delete_time: "",
 };
 
 function createInitialForm(): FormState {
@@ -131,7 +126,6 @@ function propertyToFormState(property: Property): FormState {
     company: property.company ?? "",
     building: property.building ?? "",
     available_floors: property.available_floors ?? "",
-    floor: property.floor ?? "",
     agent_name: property.agent_name ?? "",
     agent_phone: property.agent_phone ?? "",
     agent_email: property.agent_email ?? "",
@@ -140,9 +134,6 @@ function propertyToFormState(property: Property): FormState {
     auto_delete_date: hasAutoDelete
       ? toDateInputValue(property.auto_delete_at)
       : defaultAutoDeleteDateInput(),
-    auto_delete_time: hasAutoDelete
-      ? toTimeInputValue(property.auto_delete_at)
-      : "",
   };
 }
 
@@ -495,7 +486,7 @@ export default function AddPropertyModal({
         autoDeleteAt = resolveAutoDeleteAt({
           enabled: form.auto_delete_enabled,
           dateInput: form.auto_delete_date,
-          timeInput: form.auto_delete_time,
+          timeInput: "",
         });
       } catch (err) {
         setError(
@@ -517,7 +508,9 @@ export default function AddPropertyModal({
         company: form.company.trim() || null,
         building: form.building.trim() || null,
         available_floors: form.available_floors.trim() || null,
-        floor: form.floor.trim() || null,
+        // No longer editable in the UI — preserve whatever an existing
+        // record already has instead of wiping it out on every edit.
+        floor: propertyToEdit?.floor ?? null,
         agent_name: form.agent_name.trim() || null,
         agent_phone: form.agent_phone.trim() || null,
         agent_email: form.agent_email.trim() || null,
@@ -1018,18 +1011,6 @@ export default function AddPropertyModal({
 
               <label className="block sm:col-span-2">
                 <span className="mb-1 block text-sm font-medium text-zinc-700">
-                  Floor/demise
-                </span>
-                <input
-                  value={form.floor}
-                  onChange={(e) => updateField("floor", e.target.value)}
-                  className="w-full rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                  placeholder="e.g. 3rd"
-                />
-              </label>
-
-              <label className="block sm:col-span-2">
-                <span className="mb-1 block text-sm font-medium text-zinc-700">
                   Agent name
                 </span>
                 <input
@@ -1118,35 +1099,20 @@ export default function AddPropertyModal({
                 </div>
 
                 {form.auto_delete_enabled ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-zinc-600">
-                        Delete date
-                      </span>
-                      <input
-                        type="date"
-                        required={form.auto_delete_enabled}
-                        value={form.auto_delete_date}
-                        onChange={(e) =>
-                          updateField("auto_delete_date", e.target.value)
-                        }
-                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                      />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1 block text-xs font-medium text-zinc-600">
-                        Delete time (optional)
-                      </span>
-                      <input
-                        type="time"
-                        value={form.auto_delete_time}
-                        onChange={(e) =>
-                          updateField("auto_delete_time", e.target.value)
-                        }
-                        className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                      />
-                    </label>
-                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-zinc-600">
+                      Delete date
+                    </span>
+                    <input
+                      type="date"
+                      required={form.auto_delete_enabled}
+                      value={form.auto_delete_date}
+                      onChange={(e) =>
+                        updateField("auto_delete_date", e.target.value)
+                      }
+                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                    />
+                  </label>
                 ) : (
                   <p className="text-sm text-zinc-600">
                     This property will be kept (no automatic deletion).

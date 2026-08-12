@@ -11,42 +11,38 @@ function normalizePostcode(value) {
   return compact || null;
 }
 
-function extractPostcodeFromText(text) {
-  const match = text
-    .toUpperCase()
-    .match(/\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/);
-  if (!match) return null;
-  return normalizePostcode(`${match[1]}${match[2]}`);
+const UK_POSTCODE_PATTERN = /\b[a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2}\b/i;
+
+function stripAddressNoise(value) {
+  let text = normalizeComparable(value);
+  text = text.replace(UK_POSTCODE_PATTERN, " ");
+  text = text.replace(/\blondon\b/g, " ");
+  text = text.replace(/[^a-z0-9\s,]/g, " ");
+  return text
+    .split(",")
+    .map((segment) => segment.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(", ");
 }
 
-function normalizeAddress(value) {
-  return normalizeComparable(value).replace(/[^a-z0-9]/g, "");
+const LEADING_NUMBER_PATTERN = /^\d+[a-z]?\b/;
+
+function extractStreetKey(noiseStripped) {
+  const segments = noiseStripped.split(",").map((segment) => segment.trim());
+  return segments.find((segment) => LEADING_NUMBER_PATTERN.test(segment)) ?? null;
 }
 
 function addressesLookSimilar(a, b) {
-  const leftRaw = normalizeComparable(a);
-  const rightRaw = normalizeComparable(b);
-  if (!leftRaw || !rightRaw) return false;
-  if (leftRaw === rightRaw) return true;
+  const coreA = stripAddressNoise(a);
+  const coreB = stripAddressNoise(b);
+  if (!coreA || !coreB) return false;
 
-  const left = normalizeAddress(a);
-  const right = normalizeAddress(b);
-  if (!left || !right) return false;
-  if (left === right) return true;
-  if (left.includes(right) || right.includes(left)) return true;
+  const keyA = extractStreetKey(coreA);
+  const keyB = extractStreetKey(coreB);
 
-  const leftTokens = new Set(
-    leftRaw.split(/[^a-z0-9]+/).filter((token) => token.length >= 3),
-  );
-  const rightTokens = rightRaw
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 3);
-
-  if (leftTokens.size === 0 || rightTokens.length === 0) return false;
-
-  const overlap = rightTokens.filter((token) => leftTokens.has(token)).length;
-  const minSize = Math.min(leftTokens.size, rightTokens.length);
-  return overlap >= Math.max(2, Math.ceil(minSize * 0.6));
+  if (keyA && keyB) return keyA === keyB;
+  if (!keyA && !keyB) return coreA === coreB;
+  return false;
 }
 
 function findSimilarPropertyInList(candidates, options) {
@@ -55,19 +51,6 @@ function findSimilarPropertyInList(candidates, options) {
     : candidates;
 
   if (rows.length === 0) return null;
-
-  const enteredPostcode =
-    normalizePostcode(options.postcode) ??
-    extractPostcodeFromText(options.address);
-
-  if (enteredPostcode) {
-    const byPostcode = rows.find((row) => {
-      const rowPostcode =
-        normalizePostcode(row.postcode) ?? extractPostcodeFromText(row.address);
-      return rowPostcode != null && rowPostcode === enteredPostcode;
-    });
-    if (byPostcode) return byPostcode;
-  }
 
   return (
     rows.find((row) => addressesLookSimilar(options.address, row.address)) ??
@@ -111,9 +94,9 @@ const casingMatch = findSimilarPropertyInList(existing, {
   address: "30 st mary axe, london",
   postcode: "ec3a 8bf",
 });
-assert.ok(casingMatch, "expected duplicate for case-different postcode");
+assert.ok(casingMatch, "expected duplicate for same street address, different case");
 assert.equal(casingMatch.id, "1");
-console.log("✓ case-insensitive postcode duplicate detected:", casingMatch.address);
+console.log("✓ case-insensitive address duplicate detected:", casingMatch.address);
 
 const liveLike = findSimilarPropertyInList(
   [
@@ -124,6 +107,88 @@ const liveLike = findSimilarPropertyInList(
 );
 assert.ok(liveLike);
 console.log("✓ matches existing mixed-case St Mary Axe rows");
+
+// --- Stricter street-address matching (must match) ---
+
+assert.ok(
+  addressesLookSimilar("10 Stratton Street", "10 Stratton Street"),
+  "identical addresses must match",
+);
+assert.ok(
+  addressesLookSimilar("10 Stratton Street", "10 STRATTON STREET"),
+  "case differences must not prevent a match",
+);
+assert.ok(
+  addressesLookSimilar("10 Stratton Street", "10 Stratton Street, London"),
+  "trailing 'London' must not prevent a match",
+);
+assert.ok(
+  addressesLookSimilar(
+    "10 Stratton Street",
+    "10 Stratton Street, London W1J 8LG",
+  ),
+  "trailing postcode must not prevent a match",
+);
+assert.ok(
+  addressesLookSimilar(
+    "10 Stratton Street",
+    "10 Stratton Street, London, W1J 8LG",
+  ),
+  "comma-separated trailing postcode must not prevent a match",
+);
+assert.ok(
+  addressesLookSimilar(
+    "The Johnson Building, 77 Hatton Garden",
+    "77 Hatton Garden",
+  ),
+  "a numbered street address must match through a building-name prefix",
+);
+console.log("✓ harmless formatting differences (case, punctuation, London, postcode) still match");
+
+// --- Stricter street-address matching (must NOT match) ---
+
+assert.ok(
+  !addressesLookSimilar("10 Stratton Street", "11 Stratton Street"),
+  "different street numbers on the same street must not match",
+);
+assert.ok(
+  !addressesLookSimilar("11 Brook Street", "12 Brook Street"),
+  "different street numbers must not match",
+);
+assert.ok(
+  !addressesLookSimilar("11 Brook Street", "11 Grosvenor Street"),
+  "different street names must not match",
+);
+assert.ok(
+  !addressesLookSimilar("5 Oak Street", "9 Pine Street"),
+  "addresses that merely share words like 'Street' must not match",
+);
+console.log("✓ different street numbers/names are never flagged");
+
+// Postcode alone (or same-postcode, different street) must never trigger a match.
+const samePostcodeDifferentStreet = findSimilarPropertyInList(
+  [{ id: "4", address: "5 Oak Road", postcode: "SW1A 1AA" }],
+  { address: "9 Pine Lane", postcode: "SW1A 1AA" },
+);
+assert.equal(
+  samePostcodeDifferentStreet,
+  null,
+  "same postcode alone must not flag two different street addresses",
+);
+
+const brookStreetOtherPostcode = findSimilarPropertyInList(
+  [
+    { id: "5", address: "20 Brook Street", postcode: "W1K 5DA" },
+    { id: "6", address: "1 Some Other Road", postcode: "SW1A 1AA" },
+  ],
+  { address: "11 Brook Street", postcode: "SW1A 1AA" },
+);
+assert.equal(
+  brookStreetOtherPostcode,
+  null,
+  "11 Brook Street must not be flagged merely because another Brook Street or same-postcode property exists",
+);
+console.log("✓ postcode equality alone never triggers the duplicate warning");
 
 assert.equal(specsToPlainText('{"text":"vasfjnvjanv/leR"}'), "vasfjnvjanv/leR");
 console.log("✓ specs JSON wrapper unwraps to plain text");

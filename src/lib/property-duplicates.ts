@@ -13,7 +13,7 @@ export function normalizeComparable(value: string | null | undefined): string {
 
 /**
  * Normalize UK postcodes for comparison:
- * trim, lowercase (via upper then compact), strip internal spaces.
+ * trim, lowercase, strip internal spaces.
  * "EC3A 8BF" and "ec3a 8bf" both become "ec3a8bf".
  */
 export function normalizePostcode(
@@ -25,49 +25,20 @@ export function normalizePostcode(
   return compact || null;
 }
 
+const UK_POSTCODE_PATTERN = /\b[a-z]{1,2}\d[a-z\d]?\s*\d[a-z]{2}\b/i;
+
 /** Pull a UK postcode out of free text when the postcode field is empty. */
 export function extractPostcodeFromText(text: string): string | null {
-  const match = text
-    .toUpperCase()
-    .match(/\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/);
+  const match = text.match(UK_POSTCODE_PATTERN);
   if (!match) return null;
-  return normalizePostcode(`${match[1]}${match[2]}`);
-}
-
-function normalizeAddress(value: string): string {
-  return normalizeComparable(value).replace(/[^a-z0-9]/g, "");
+  return normalizePostcode(match[0]);
 }
 
 /**
- * True when two address strings are exact (case-insensitive), one contains
- * the other, or they share enough significant tokens to look like the same place.
+ * Postcode equality alone is never used to flag a duplicate (see
+ * addressesLookSimilar) — this is kept as a small standalone helper for
+ * anywhere postcode equality is a useful signal on its own.
  */
-export function addressesLookSimilar(a: string, b: string): boolean {
-  const leftRaw = normalizeComparable(a);
-  const rightRaw = normalizeComparable(b);
-  if (!leftRaw || !rightRaw) return false;
-  if (leftRaw === rightRaw) return true;
-
-  const left = normalizeAddress(a);
-  const right = normalizeAddress(b);
-  if (!left || !right) return false;
-  if (left === right) return true;
-  if (left.includes(right) || right.includes(left)) return true;
-
-  const leftTokens = new Set(
-    leftRaw.split(/[^a-z0-9]+/).filter((token) => token.length >= 3),
-  );
-  const rightTokens = rightRaw
-    .split(/[^a-z0-9]+/)
-    .filter((token) => token.length >= 3);
-
-  if (leftTokens.size === 0 || rightTokens.length === 0) return false;
-
-  const overlap = rightTokens.filter((token) => leftTokens.has(token)).length;
-  const minSize = Math.min(leftTokens.size, rightTokens.length);
-  return overlap >= Math.max(2, Math.ceil(minSize * 0.6));
-}
-
 export function postcodesMatch(
   a: string | null | undefined,
   b: string | null | undefined,
@@ -78,8 +49,62 @@ export function postcodesMatch(
 }
 
 /**
+ * Strip formatting noise from an address — postcode, the word "London",
+ * and punctuation — leaving lowercase, comma-separated segments.
+ */
+function stripAddressNoise(value: string): string {
+  let text = normalizeComparable(value);
+  text = text.replace(UK_POSTCODE_PATTERN, " ");
+  text = text.replace(/\blondon\b/g, " ");
+  text = text.replace(/[^a-z0-9\s,]/g, " ");
+  return text
+    .split(",")
+    .map((segment) => segment.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+const LEADING_NUMBER_PATTERN = /^\d+[a-z]?\b/;
+
+/**
+ * The building/street-number + street-name segment of a noise-stripped
+ * address, e.g. "10 stratton street" out of
+ * "the johnson building, 10 stratton street". Returns null when no segment
+ * starts with a number — callers must not treat a bare building name as a
+ * strong identifier on its own.
+ */
+function extractStreetKey(noiseStripped: string): string | null {
+  const segments = noiseStripped.split(",").map((segment) => segment.trim());
+  return segments.find((segment) => LEADING_NUMBER_PATTERN.test(segment)) ?? null;
+}
+
+/**
+ * True only when two addresses share the same building/street number and
+ * street name — not merely the same postcode, a substring relationship, or
+ * overlapping words. Harmless formatting differences (case, punctuation,
+ * commas, "London", a trailing postcode) are ignored, but a different
+ * building/street number is not. When neither address has a leading
+ * street number (pure building names), falls back to exact match on the
+ * noise-stripped text so unrelated buildings aren't flagged.
+ */
+export function addressesLookSimilar(a: string, b: string): boolean {
+  const coreA = stripAddressNoise(a);
+  const coreB = stripAddressNoise(b);
+  if (!coreA || !coreB) return false;
+
+  const keyA = extractStreetKey(coreA);
+  const keyB = extractStreetKey(coreB);
+
+  if (keyA && keyB) return keyA === keyB;
+  if (!keyA && !keyB) return coreA === coreB;
+  return false;
+}
+
+/**
  * Pure matcher used by findSimilarProperty (and unit tests).
- * Prefers: same postcode → case-insensitive address → fuzzy address.
+ * Matches only on street address (building/street number + street name).
+ * A shared postcode alone is never sufficient — different buildings can
+ * legitimately share, or sit right next to, the same postcode.
  */
 export function findSimilarPropertyInList(
   candidates: SimilarProperty[],
@@ -91,26 +116,10 @@ export function findSimilarPropertyInList(
 
   if (rows.length === 0) return null;
 
-  const enteredPostcode =
-    normalizePostcode(options.postcode) ??
-    extractPostcodeFromText(options.address);
-
-  // 1) Case-insensitive postcode match (field or extracted from address).
-  if (enteredPostcode) {
-    const byPostcode = rows.find((row) => {
-      const rowPostcode =
-        normalizePostcode(row.postcode) ?? extractPostcodeFromText(row.address);
-      return rowPostcode != null && rowPostcode === enteredPostcode;
-    });
-    if (byPostcode) return byPostcode;
-  }
-
-  // 2) Case-insensitive exact / fuzzy address match.
-  const byAddress = rows.find((row) =>
-    addressesLookSimilar(options.address, row.address),
+  return (
+    rows.find((row) => addressesLookSimilar(options.address, row.address)) ??
+    null
   );
-
-  return byAddress ?? null;
 }
 
 /**
